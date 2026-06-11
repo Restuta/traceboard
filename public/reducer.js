@@ -8,7 +8,7 @@ const FEED_CAP = 150;
 
 export function initialState() {
   return {
-    session: { title: null, startedAt: null, lastAt: null, phase: null, cwd: null },
+    session: { title: null, startedAt: null, lastAt: null, phase: null, cwd: null, attentionText: null },
     items: new Map(),
     todos: [],
     feed: [],
@@ -46,10 +46,16 @@ export function reduce(state, ev) {
       if (ev.phase === 'start' || ev.phase === 'resume') {
         if (state.session.startedAt == null) state.session.startedAt = ev.t;
         state.session.phase = 'working';
+        state.session.attentionText = null;
+      } else if (ev.phase === 'attention') {
+        state.session.phase = 'attention';
+        state.session.attentionText = ev.text || null;
       } else if (ev.phase === 'idle') {
         state.session.phase = 'idle';
+        state.session.attentionText = null;
       } else if (ev.phase === 'end') {
         state.session.phase = 'ended';
+        state.session.attentionText = null;
       }
       break;
     }
@@ -85,6 +91,11 @@ export function reduce(state, ev) {
       state.totals.edits++;
       const it = targetItem(state, ev);
       if (it) { it.edits++; it.touchedAt = ev.t; }
+      // Tool activity means the request was answered — clear the alarm.
+      if (state.session.phase === 'attention') {
+        state.session.phase = 'working';
+        state.session.attentionText = null;
+      }
       break;
     }
 
@@ -98,6 +109,10 @@ export function reduce(state, ev) {
         it.add += ev.add || 0;
         it.del += ev.del || 0;
         it.touchedAt = ev.t;
+      }
+      if (state.session.phase === 'attention') {
+        state.session.phase = 'working';
+        state.session.attentionText = null;
       }
       break;
     }

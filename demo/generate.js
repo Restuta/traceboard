@@ -75,6 +75,7 @@ e(20.5, { type: 'todos', todos: [
   { text: 'activity tape', done: false },
 ] });
 e(21.4, { type: 'edit', path: 'public/index.html' });
+e(21.9, { type: 'session', phase: 'attention', text: 'Permission needed: install Google Fonts locally?' });
 e(22.8, { type: 'edit', path: 'public/style.css' });
 e(24.0, { type: 'commit', sha: 'e58c3aa', message: 'ui: board columns + cards', add: 342, del: 18, files: 3 });
 e(24.2, { type: 'todos', todos: [

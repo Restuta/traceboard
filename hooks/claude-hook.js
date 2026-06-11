@@ -41,6 +41,13 @@ function main() {
     return;
   }
 
+  if (name === 'Notification') {
+    // Fires when the agent needs permission or input — the one state the
+    // human must act on. Surfaced loudly by the board.
+    append({ type: 'session', phase: 'attention', text: hook.message || '', session: hook.session_id });
+    return;
+  }
+
   if (name === 'PostToolUse') {
     const tool = hook.tool_name || '';
     const inp = hook.tool_input || {};

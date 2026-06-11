@@ -408,10 +408,15 @@ function feedLine(ev) {
   switch (ev.type) {
     case 'session':
       tag = 'sess'; cls = 'session';
-      tx = ev.phase === 'start' ? 'session started'
-        : ev.phase === 'resume' ? 'prompt received'
-        : ev.phase === 'idle' ? 'agent idle — turn finished'
-        : 'session ended';
+      if (ev.phase === 'attention') {
+        tag = 'ask'; cls = 'ci-fail';
+        tx = `needs input${ev.text ? ` — ${esc(ev.text)}` : ''}`;
+      } else {
+        tx = ev.phase === 'start' ? 'session started'
+          : ev.phase === 'resume' ? 'prompt received'
+          : ev.phase === 'idle' ? 'agent idle — turn finished'
+          : 'session ended';
+      }
       break;
     case 'item':
       tx = ev.status && !ev.title ? `<b>${esc(ev.id)}</b> → ${esc(ev.status)}`
@@ -484,6 +489,9 @@ function renderStatus() {
   if (!live) {
     badge.classList.add('is-replay');
     text.textContent = playing ? `REPLAY ${speed}×` : 'PAUSED';
+  } else if (state.session.phase === 'attention') {
+    badge.classList.add('is-attn');
+    text.textContent = 'NEEDS INPUT';
   } else if (state.session.phase === 'working') {
     badge.classList.add('is-live');
     text.textContent = 'LIVE';
@@ -495,6 +503,32 @@ function renderStatus() {
   }
   $('#btn-live').classList.toggle('on', live);
   $('#btn-play').textContent = playing ? '❚❚' : '▶';
+  renderAttention();
+}
+
+// The one state the human must act on gets the loud treatment: a banner
+// over the board and a tab title you can spot from another screen.
+function renderAttention() {
+  const banner = $('#attention');
+  const phase = state.session.phase;
+  const waiting = ageText(Math.max(0, vtNow() - (state.session.lastAt || vtNow())));
+  if (live && phase === 'attention') {
+    banner.hidden = false;
+    banner.classList.add('urgent');
+    $('#attention-text').textContent =
+      `Agent needs you — ${state.session.attentionText || 'permission or input requested'}`;
+    $('#attention-age').textContent = `waiting ${waiting}`;
+    document.title = '🔴 needs input · traceboard';
+  } else if (live && phase === 'idle') {
+    banner.hidden = false;
+    banner.classList.remove('urgent');
+    $('#attention-text').textContent = 'Turn finished — agent is waiting for your next prompt';
+    $('#attention-age').textContent = `idle ${waiting}`;
+    document.title = '◌ waiting · traceboard';
+  } else {
+    banner.hidden = true;
+    document.title = 'traceboard';
+  }
 }
 
 function renderReadout() {
@@ -559,6 +593,7 @@ setInterval(() => {
   if (live) {
     renderReadout();
     drawTimeline();
+    renderAttention();
     for (const el of cardEls.values()) {
       if (el._touchedAt) el._refs.age.textContent = ageText(Date.now() - el._touchedAt);
     }

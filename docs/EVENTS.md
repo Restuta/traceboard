@@ -26,10 +26,15 @@ Unknown event types must be ignored by consumers (forward compatibility).
 ## Types
 
 ### `session`
-Session lifecycle. `{phase: "start" | "resume" | "idle" | "end", title?, session?, cwd?}`
+Session lifecycle. `{phase: "start" | "resume" | "attention" | "idle" | "end", title?, text?, session?, cwd?}`
 - `start` opens the board clock; `resume` fires on each user prompt; `idle`
   means the agent finished a turn and is waiting for input; `end` closes the
   session. `start`/`resume` flip the badge to LIVE, `idle` to IDLE.
+- `attention` (from Claude Code's `Notification` hook) means the agent is
+  blocked on the human — permission prompt or a question. The board surfaces
+  it loudly: red banner, badge, and tab title. It clears on `resume`/`idle`
+  or on any subsequent tool activity (`edit`/`commit`), since activity means
+  the request was answered.
 
 ### `item`
 Work item upsert — the kanban cards. `{id, title?, status?, note?}`

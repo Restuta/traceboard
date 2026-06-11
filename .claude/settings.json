@@ -21,6 +21,13 @@
         ]
       }
     ],
+    "Notification": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/hooks/claude-hook.js\"" }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|TodoWrite",
