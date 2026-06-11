@@ -124,16 +124,28 @@ e(44.2, { type: 'todos', todos: [
 e(45.0, { type: 'edit', path: 'public/app.js' });
 e(45.9, { type: 'edit', path: 'public/style.css' });
 e(46.3, { type: 'commit', sha: '3d05b77', message: 'ui: timeline canvas + scrubber', add: 176, del: 22, files: 2 });
-
-// --- human drops a card mid-flight (the bidirectional moment)
-e(46.8, { type: 'item', id: 'wi-churn', title: 'Churn heatmap — flag add/delete/re-add loops', status: 'inbox' });
-
-e(47.3, { type: 'note', text: 'Replay at 60× reads like a time-lapse of the session. Demo-ready.' });
-e(47.6, { type: 'todos', todos: [
+e(46.4, { type: 'todos', item: 'wi-replay', todos: [
   { text: 'virtual clock + fold(log, t)', done: true },
   { text: 'timeline canvas, density buckets', done: true },
   { text: 'scrub + play at 1×/10×/60×', done: true },
 ] });
+e(46.5, { type: 'pr', number: 3, title: 'replay engine + timeline', state: 'open', url: 'https://github.com/Restuta/traceboard/pull/3' });
+e(46.6, { type: 'ci', pr: 3, status: 'pending' });
+
+// --- human drops a card mid-flight (the bidirectional moment)
+e(46.8, { type: 'item', id: 'wi-churn', title: 'Churn heatmap — flag add/delete/re-add loops', status: 'inbox' });
+
+// --- self-observation wiring starts while PR 3 waits on checks
+e(47.0, { type: 'item', id: 'wi-dogfood', title: 'Dogfood: hooks emit this board\'s own events', status: 'doing' });
+e(47.1, { type: 'todos', todos: [
+  { text: 'claude-hook.js → edit/session events', done: true },
+  { text: 'git post-commit → commit events', done: true },
+  { text: 'inbox pickup on UserPromptSubmit', done: false },
+] });
+e(47.2, { type: 'edit', path: 'hooks/claude-hook.js' });
+e(47.3, { type: 'note', text: 'Replay at 60× reads like a time-lapse of the session. Demo-ready.' });
+e(47.5, { type: 'edit', path: '.claude/settings.json' });
+e(47.7, { type: 'ci', pr: 3, status: 'pass' });
 e(47.8, { type: 'session', phase: 'idle' });
 
 const out = path.join(__dirname, 'events.jsonl');
