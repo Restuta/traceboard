@@ -1,4 +1,4 @@
-// traceboard engine: SSE in, pure fold to state, animated render out.
+// nightshift engine: SSE in, pure fold to state, animated render out.
 // Two clocks exist — wall time (live) and virtual time `vt` (replay). Every
 // render path goes through renderAll(); animation only happens on forward,
 // incremental application of events, never on rebuilds (scrub/refresh).
@@ -518,16 +518,16 @@ function renderAttention() {
     $('#attention-text').textContent =
       `Agent needs you — ${state.session.attentionText || 'permission or input requested'}`;
     $('#attention-age').textContent = `waiting ${waiting}`;
-    document.title = '🔴 needs input · traceboard';
+    document.title = '🔴 needs input · nightshift';
   } else if (live && phase === 'idle') {
     banner.hidden = false;
     banner.classList.remove('urgent');
     $('#attention-text').textContent = 'Turn finished — agent is waiting for your next prompt';
     $('#attention-age').textContent = `idle ${waiting}`;
-    document.title = '◌ waiting · traceboard';
+    document.title = '◌ waiting · nightshift';
   } else {
     banner.hidden = true;
-    document.title = 'traceboard';
+    document.title = 'nightshift';
   }
 }
 

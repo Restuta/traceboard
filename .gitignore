@@ -1,5 +1,5 @@
 .DS_Store
 node_modules/
-.traceboard/
+.nightshift/
 demo/events.jsonl
 docs/screenshots/scratch-*

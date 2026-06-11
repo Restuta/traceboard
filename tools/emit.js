@@ -15,7 +15,7 @@ if (!type || type.startsWith('--')) {
 }
 
 const ev = { t: Date.now(), type };
-let log = path.join(process.env.CLAUDE_PROJECT_DIR || '.', '.traceboard', 'events.jsonl');
+let log = path.join(process.env.CLAUDE_PROJECT_DIR || '.', '.nightshift', 'events.jsonl');
 
 for (let i = 0; i < rest.length; i += 2) {
   const key = String(rest[i] || '').replace(/^--/, '');

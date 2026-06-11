@@ -1,7 +1,7 @@
 {
-  "name": "traceboard",
+  "name": "nightshift",
   "version": "0.1.0",
-  "description": "A live flight recorder for AI agent sessions — kanban board + replay, rendered from an append-only event log.",
+  "description": "Your agent works the night shift — a live board + flight recorder for AI agent sessions, rendered from an append-only event log.",
   "license": "MIT",
   "engines": { "node": ">=18" },
   "scripts": {

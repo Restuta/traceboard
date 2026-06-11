@@ -1,10 +1,10 @@
 # Event Log Schema
 
-The event log is the single contract of traceboard. Everything else — server, UI,
+The event log is the single contract of nightshift. Everything else — server, UI,
 hooks, replay — is a producer or a pure consumer of this log.
 
 - Storage: one JSON object per line (JSONL), append-only. Default location:
-  `.traceboard/events.jsonl` in the project being observed.
+  `.nightshift/events.jsonl` in the project being observed.
 - The UI state is `reduce(events[0..t])`. Live mode is `t = now`; replay is any
   earlier `t`. This only works if reducers are pure over the log, so:
 - **Rule: external facts are recorded as events, never fetched at render time.**

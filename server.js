@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// traceboard server — zero-dep static + SSE event-log tail.
+// nightshift server — zero-dep static + SSE event-log tail.
 // Usage: node server.js [--log path/to/events.jsonl] [--port 4173]
 
 const http = require('http');
@@ -13,7 +13,7 @@ function flag(name, fallback) {
 }
 
 const PORT = Number(flag('port', process.env.PORT || 4173));
-const LOG = path.resolve(flag('log', path.join('.traceboard', 'events.jsonl')));
+const LOG = path.resolve(flag('log', path.join('.nightshift', 'events.jsonl')));
 const PUBLIC = path.join(__dirname, 'public');
 
 fs.mkdirSync(path.dirname(LOG), { recursive: true });
@@ -108,6 +108,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`traceboard  http://localhost:${PORT}`);
+  console.log(`nightshift  http://localhost:${PORT}`);
   console.log(`tailing     ${LOG}`);
 });

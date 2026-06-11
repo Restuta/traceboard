@@ -1,4 +1,4 @@
-# traceboard
+# nightshift
 
 A live "flight recorder" for AI agent sessions: a kanban board + replay timeline
 rendered from an append-only event log. This project observes agent sessions —
@@ -38,7 +38,7 @@ including the ones building it.
 ## Commands
 
 - `npm run demo` — generate demo log, serve board at http://localhost:4173
-- `npm start` — serve the live dogfood log (`.traceboard/events.jsonl`)
+- `npm start` — serve the live dogfood log (`.nightshift/events.jsonl`)
 - `npm run setup` — enable the git post-commit hook (once per clone)
 
 ## Dogfooding protocol (for the agent working in this repo)

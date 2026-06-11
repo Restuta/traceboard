@@ -21,7 +21,7 @@ try {
   const m = stat.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
   if (m) { files = +m[1]; add = +(m[2] || 0); del = +(m[3] || 0); }
 
-  const log = path.join(root, '.traceboard', 'events.jsonl');
+  const log = path.join(root, '.nightshift', 'events.jsonl');
   fs.mkdirSync(path.dirname(log), { recursive: true });
   fs.appendFileSync(log, JSON.stringify({ t: Date.now(), type: 'commit', sha, message, add, del, files }) + '\n');
 } catch { /* never block a commit */ }

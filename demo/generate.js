@@ -15,7 +15,7 @@ const events = [];
 const e = (min, ev) => events.push({ t: Math.round(base + min * MIN), ...ev });
 
 // --- t+0 — session opens, plan goes up
-e(0.0, { type: 'session', phase: 'start', title: 'building traceboard', cwd: '/Users/restuta/Projects/ai/experiments/traceboard' });
+e(0.0, { type: 'session', phase: 'start', title: 'building nightshift', cwd: '/Users/restuta/Projects/ai/experiments/nightshift' });
 e(0.4, { type: 'note', text: 'Plan: schema → server → UI → replay. Board watches itself from here.' });
 e(0.6, { type: 'item', id: 'wi-schema', title: 'Event schema + pure reducer', status: 'doing' });
 e(0.7, { type: 'item', id: 'wi-server', title: 'Zero-dep SSE tail server', status: 'inbox' });
@@ -61,7 +61,7 @@ e(14.0, { type: 'commit', sha: 'c91a4d7', message: 'server: zero-dep static + SS
 e(15.2, { type: 'note', text: 'fs.watch unreliable across editors — added 300ms polling fallback alongside it.' });
 e(15.9, { type: 'edit', path: 'server.js' });
 e(16.3, { type: 'commit', sha: 'd44e0b1', message: 'server: polling fallback for fs.watch', add: 24, del: 6, files: 1 });
-e(17.0, { type: 'pr', number: 1, title: 'foundation: schema, reducer, SSE server', state: 'open', url: 'https://github.com/Restuta/traceboard/pull/1' });
+e(17.0, { type: 'pr', number: 1, title: 'foundation: schema, reducer, SSE server', state: 'open', url: 'https://github.com/Restuta/nightshift/pull/1' });
 e(17.2, { type: 'ci', pr: 1, status: 'pending' });
 e(19.1, { type: 'ci', pr: 1, status: 'pass' });
 e(20.0, { type: 'pr', number: 1, state: 'merged' });
@@ -97,7 +97,7 @@ e(33.2, { type: 'todos', todos: [
   { text: 'FLIP transitions between columns', done: true },
   { text: 'activity tape', done: true },
 ] });
-e(34.8, { type: 'pr', number: 2, title: 'kanban board UI', state: 'open', url: 'https://github.com/Restuta/traceboard/pull/2' });
+e(34.8, { type: 'pr', number: 2, title: 'kanban board UI', state: 'open', url: 'https://github.com/Restuta/nightshift/pull/2' });
 e(35.0, { type: 'ci', pr: 2, status: 'pending' });
 e(36.4, { type: 'ci', pr: 2, status: 'fail' });
 e(36.6, { type: 'note', text: 'CI red: stylelint — custom property typo. Fixing.' });
@@ -130,7 +130,7 @@ e(46.4, { type: 'todos', item: 'wi-replay', todos: [
   { text: 'timeline canvas, density buckets', done: true },
   { text: 'scrub + play at 1×/10×/60×', done: true },
 ] });
-e(46.5, { type: 'pr', number: 3, title: 'replay engine + timeline', state: 'open', url: 'https://github.com/Restuta/traceboard/pull/3' });
+e(46.5, { type: 'pr', number: 3, title: 'replay engine + timeline', state: 'open', url: 'https://github.com/Restuta/nightshift/pull/3' });
 e(46.6, { type: 'ci', pr: 3, status: 'pending' });
 
 // --- human drops a card mid-flight (the bidirectional moment)

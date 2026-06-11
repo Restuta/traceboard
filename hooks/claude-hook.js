@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const LOG = path.join(root, '.traceboard', 'events.jsonl');
+const LOG = path.join(root, '.nightshift', 'events.jsonl');
 
 function append(ev) {
   fs.mkdirSync(path.dirname(LOG), { recursive: true });
@@ -74,7 +74,7 @@ function main() {
     if (inbox.length) {
       const lines = inbox.map(it => `- [${it.id}] ${it.title || '(untitled)'}`);
       console.log(
-        `Traceboard inbox has ${inbox.length} open card(s) added by the human:\n` +
+        `Nightshift inbox has ${inbox.length} open card(s) added by the human:\n` +
         lines.join('\n') +
         `\nIf one is relevant to this turn, move it to "doing" via tools/emit.js and handle it; otherwise leave it.`
       );
