@@ -3,7 +3,7 @@
 // render path goes through renderAll(); animation only happens on forward,
 // incremental application of events, never on rebuilds (scrub/refresh).
 
-import { initialState, reduce, fold, activeItemId, STATUSES } from './reducer.js';
+import { initialState, reduce, fold, activeItemId, hotFiles, STATUSES } from './reducer.js';
 
 const $ = sel => document.querySelector(sel);
 
@@ -505,6 +505,20 @@ function renderFeed(freshEvents) {
   $('#count-feed').textContent = state.totals.events || '';
 }
 
+// ------------------------------------------------------------- hot files
+
+function renderHotfiles() {
+  const box = $('#hotfiles');
+  const hot = hotFiles(state);
+  box.hidden = !hot.length;
+  if (!hot.length) return;
+  $('#hotfiles-list').innerHTML = hot.map(f => {
+    const i = f.path.lastIndexOf('/');
+    const file = i < 0 ? esc(f.path) : `${esc(f.path.slice(0, i + 1))}<b>${esc(f.path.slice(i + 1))}</b>`;
+    return `<li class="${f.tier}"><i class="heat"></i><span class="fpath">${file}</span><span class="fcount">${f.edits}×</span></li>`;
+  }).join('');
+}
+
 // ------------------------------------------------------------ instruments
 
 // Who works this shift — glyph + name, colored per agent. Unknown agents get
@@ -590,6 +604,7 @@ function renderReadout() {
 function renderAll(animate, freshEvents = null) {
   renderInstruments(animate);
   renderBoard(animate);
+  renderHotfiles();
   renderFeed(animate ? freshEvents : null);
   renderStatus();
   renderReadout();

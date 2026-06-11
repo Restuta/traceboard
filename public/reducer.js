@@ -11,6 +11,7 @@ export function initialState() {
     session: { title: null, startedAt: null, lastAt: null, phase: null, cwd: null, agent: null, attentionText: null },
     items: new Map(),
     todos: [],
+    files: new Map(), // path → {edits, lastAt} — churn signal
     feed: [],
     totals: { add: 0, del: 0, commits: 0, edits: 0, events: 0 },
   };
@@ -91,6 +92,12 @@ export function reduce(state, ev) {
 
     case 'edit': {
       state.totals.edits++;
+      if (ev.path) {
+        const f = state.files.get(ev.path) || { edits: 0, lastAt: 0 };
+        f.edits++;
+        f.lastAt = ev.t;
+        state.files.set(ev.path, f);
+      }
       const it = targetItem(state, ev);
       if (it) { it.edits++; it.touchedAt = ev.t; }
       // Tool activity means the request was answered — clear the alarm.
@@ -156,6 +163,16 @@ export function fold(events, untilT = Infinity) {
     reduce(state, ev);
   }
   return state;
+}
+
+// Files an agent keeps coming back to — the visual signature of flailing.
+// Pure over state, so live and replay agree. Tiers: 3+ warm, 5+ hot, 8+ churn.
+export function hotFiles(state, min = 3, cap = 5) {
+  return [...state.files.entries()]
+    .filter(([, f]) => f.edits >= min)
+    .sort((a, b) => b[1].edits - a[1].edits || b[1].lastAt - a[1].lastAt)
+    .slice(0, cap)
+    .map(([path, f]) => ({ path, ...f, tier: f.edits >= 8 ? 'churn' : f.edits >= 5 ? 'hot' : 'warm' }));
 }
 
 // The card whose todo drill-in is expanded: most recently touched `doing` item.
