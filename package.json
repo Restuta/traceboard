@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "demo": "node demo/generate.js && node server.js --log demo/events.jsonl",
+    "import": "node tools/import-transcript.js",
     "setup": "git config core.hooksPath .githooks && echo 'git hooks enabled (core.hooksPath=.githooks)'"
   }
 }

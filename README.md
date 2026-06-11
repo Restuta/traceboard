@@ -75,6 +75,21 @@ The board is also **bidirectional**: type into the inbox column and the card is
 appended to the log; the `UserPromptSubmit` hook surfaces open inbox cards to
 the agent as context at the start of its next turn.
 
+## Importing a past session
+
+No hooks in place when the session ran? Synthesize the tape after the fact from
+the Claude Code transcript (`~/.claude/projects/<munged-cwd>/<session-id>.jsonl`):
+
+```sh
+npm run import -- <transcript.jsonl> --repo <repo>
+node server.js --log .nightshift/import-<id>.jsonl
+```
+
+Human prompts, file edits, todos, and agent questions are read from the
+transcript. With `--repo`, commit facts — sha, message, line counts — come
+straight from `git log` over the session's time window instead of being parsed
+out of model output, so the tickers show exactly what git recorded.
+
 ## Event vocabulary
 
 `session` · `item` · `todos` · `edit` · `commit` · `pr` · `ci` · `note` —
@@ -84,7 +99,7 @@ vocabulary can grow without breaking old logs.
 
 ## Roadmap
 
-- [ ] Transcript importer — synthesize a board from any past Claude Code
+- [x] Transcript importer — synthesize a board from any past Claude Code
       session JSONL, no hooks required (attach retroactively)
 - [ ] PR/CI poller — record GitHub facts as events (`pr`, `ci`) automatically
 - [ ] Churn heatmap — surface add/delete/re-add loops, the visual signature of

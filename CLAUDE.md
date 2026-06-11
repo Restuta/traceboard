@@ -33,6 +33,8 @@ including the ones building it.
   Enabled by `npm run setup` (sets `core.hooksPath`).
 - `tools/emit.js` — append an event from the CLI; used by the agent (see below)
   and humans.
+- `tools/import-transcript.js` — synthesize a tape from a past Claude Code
+  transcript; `--repo` sources commit facts from `git log`, not model output.
 - `demo/generate.js` — synthesizes a realistic session log for demos and UI work.
 
 ## Commands
