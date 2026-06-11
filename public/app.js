@@ -218,18 +218,18 @@ function drawTimeline() {
     const b = buckets[i];
     if (!b) continue;
     const h = Math.min(base - 8, 3 + Math.sqrt(b.n) * 7);
-    ctx.fillStyle = b.commit ? '#d29922' : b.pr ? '#4ea7fc' : '#26282e';
+    ctx.fillStyle = b.commit ? '#d29922' : b.pr ? '#4ea7fc' : '#232c47';
     ctx.fillRect(i * BW + 1, base - h, BW - 2, h);
   }
 
   // baseline
-  ctx.fillStyle = '#1a1c20';
+  ctx.fillStyle = '#1b2338';
   ctx.fillRect(0, base, W, 1);
 
   // unplayed tape dimmed while in replay
   const px = x(Math.min(vtNow(), t1));
   if (!live) {
-    ctx.fillStyle = 'rgba(9,10,11,.62)';
+    ctx.fillStyle = 'rgba(7,10,19,.62)';
     ctx.fillRect(px, 0, W - px, H);
   }
 

@@ -4,15 +4,15 @@
    Motion = data changing, never decoration. */
 
 :root {
-  --bg: #090a0b;
-  --lane: #0e0f11;
-  --card: #16171a;
-  --card-hover: #1a1b1f;
-  --line: #23252a;
-  --line-soft: #1a1c20;
-  --ink: #e8eaed;
-  --dim: #8a8f98;
-  --faint: #5e646e;
+  --bg: #070a13;
+  --lane: #0c101c;
+  --card: #131927;
+  --card-hover: #171e30;
+  --line: #222b42;
+  --line-soft: #18202f;
+  --ink: #e6eaf2;
+  --dim: #8b93a8;
+  --faint: #5d6781;
   --yellow: #d29922;
   --green: #4cb782;
   --red: #eb6e64;
@@ -31,11 +31,33 @@ body {
   font-family: var(--sans);
   font-size: 13px;
   color: var(--ink);
-  background: var(--bg);
+  background:
+    radial-gradient(1100px 420px at 72% -12%, rgba(20, 29, 56, .35) 0%, transparent 70%),
+    var(--bg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+/* a sparse starfield behind the panels — atmosphere, not decoration */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 25px 35px, rgba(214, 228, 255, .32), transparent),
+    radial-gradient(1px 1px at 160px 92px, rgba(214, 228, 255, .18), transparent),
+    radial-gradient(1.3px 1.3px at 312px 152px, rgba(240, 226, 192, .26), transparent),
+    radial-gradient(1px 1px at 422px 58px, rgba(214, 228, 255, .22), transparent),
+    radial-gradient(1px 1px at 92px 212px, rgba(214, 228, 255, .15), transparent),
+    radial-gradient(1.2px 1.2px at 512px 232px, rgba(214, 228, 255, .28), transparent),
+    radial-gradient(1px 1px at 668px 310px, rgba(214, 228, 255, .12), transparent),
+    radial-gradient(1px 1px at 205px 332px, rgba(240, 226, 192, .16), transparent);
+  background-size: 740px 390px, 740px 390px, 740px 390px, 740px 390px,
+                   1120px 540px, 1120px 540px, 1120px 540px, 1120px 540px;
+  background-repeat: repeat;
 }
 
 button { font-family: inherit; }
@@ -309,13 +331,13 @@ body.tape-collapsed .tape { border-left: none; }
   flex: none;
   background:
     radial-gradient(closest-side, var(--card) 56%, transparent 0),
-    conic-gradient(var(--ring-c, var(--yellow)) var(--p, 0%), #2a2c31 0);
+    conic-gradient(var(--ring-c, var(--yellow)) var(--p, 0%), #283150 0);
 }
 
 .card:hover .pill.progress .ring {
   background:
     radial-gradient(closest-side, var(--card-hover) 56%, transparent 0),
-    conic-gradient(var(--ring-c, var(--yellow)) var(--p, 0%), #2a2c31 0);
+    conic-gradient(var(--ring-c, var(--yellow)) var(--p, 0%), #283150 0);
 }
 
 .pill.pr { color: var(--blue); border-color: #4ea7fc33; }
