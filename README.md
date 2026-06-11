@@ -97,6 +97,20 @@ transcript. Commit facts — sha, message, line counts — come straight from
 or `--repo <path>`) instead of being parsed out of model output, so the
 tickers show exactly what git recorded.
 
+## Many sessions, one server
+
+Point the server at several tapes and a session switcher appears in the
+masthead:
+
+```sh
+node server.js --log a/.nightshift/events.jsonl --log b/.nightshift/events.jsonl
+node server.js --dir ~/tapes        # serve every *.jsonl in a folder
+```
+
+Switching reconnects the board to the chosen tape (the selection lives in the
+`?session=` URL, so it's linkable). A single `--log` serves one session with no
+switcher, exactly as before.
+
 ## Which agent is on shift?
 
 `session` events carry an `agent` field, rendered as a badge next to the
@@ -108,7 +122,7 @@ approval-request events; for the full picture, import the rollout afterwards.
 
 ## Event vocabulary
 
-`session` · `item` · `todos` · `edit` · `commit` · `pr` · `ci` · `note` —
+`session` · `item` · `todos` · `edit` · `commit` · `pr` · `ci` · `usage` · `note` —
 envelope, semantics, and the attribution heuristic are specified in
 [docs/EVENTS.md](docs/EVENTS.md). Unknown types are ignored by design, so the
 vocabulary can grow without breaking old logs.
@@ -121,7 +135,7 @@ vocabulary can grow without breaking old logs.
       (`node tools/poll-github.js`, gh-based, appends only deltas)
 - [x] Churn heatmap — hot-files strip in the tape; repeat-edit counts in three
       heat tiers, the visual signature of an agent flailing
-- [ ] Multi-session switcher — one server, many tapes
+- [x] Multi-session switcher — one server, many tapes (`--log`×N / `--dir`)
 - [ ] Shareable replays — export a tape + static player
 
 ## License

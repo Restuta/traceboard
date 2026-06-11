@@ -81,41 +81,88 @@ function setNum(el, val, animate, fmt = n => n.toLocaleString('en-US')) {
 
 // -------------------------------------------------------------- transport
 
-const es = new EventSource('/sse');
+let es = null;
+let sessionId = null;
+let firstConnect = true;
 
-es.onmessage = e => {
-  let ev;
-  try { ev = JSON.parse(e.data); } catch { return; }
-  if (typeof ev.t !== 'number' || typeof ev.type !== 'string') return;
-  log.push(ev);
-  if (!ready) return;
-  if (live) {
-    reduce(state, ev);
-    cursor++;
-    renderAll(true, [ev]);
-  } else {
-    drawTimeline(); // tape grows under the paused/replaying view
+function connect(id) {
+  if (es) es.close();
+  sessionId = id;
+  // Fresh slate for the incoming tape.
+  log.length = 0;
+  state = initialState();
+  cursor = 0;
+  ready = false;
+  live = true; playing = false;
+  for (const el of cardEls.values()) el.remove();
+  cardEls.clear();
+  feedEl.innerHTML = '';
+
+  es = new EventSource('/sse?session=' + encodeURIComponent(id));
+
+  es.onmessage = e => {
+    let ev;
+    try { ev = JSON.parse(e.data); } catch { return; }
+    if (typeof ev.t !== 'number' || typeof ev.type !== 'string') return;
+    log.push(ev);
+    if (!ready) return;
+    if (live) {
+      reduce(state, ev);
+      cursor++;
+      renderAll(true, [ev]);
+    } else {
+      drawTimeline(); // tape grows under the paused/replaying view
+    }
+  };
+
+  es.addEventListener('ready', () => {
+    ready = true;
+    state = fold(log);
+    cursor = log.length;
+    vt = log.length ? log[log.length - 1].t : Date.now();
+    renderAll(false);
+    // deep link into the tape: ?at=0.45 (fraction) or ?at=620 (seconds from
+    // start). Only on the initial load — switching sessions starts live.
+    if (firstConnect) {
+      firstConnect = false;
+      const at = new URLSearchParams(location.search).get('at');
+      if (at != null && log.length) {
+        const t0 = log[0].t, t1 = log[log.length - 1].t;
+        const v = parseFloat(at);
+        if (!Number.isNaN(v)) scrubTo(v <= 1 ? t0 + v * (t1 - t0) : t0 + v * 1000);
+      }
+    }
+  });
+
+  es.onerror = () => { $('#status-text').textContent = 'RECONNECTING'; };
+}
+
+// Session switcher — fetch the served tapes; show the dropdown when >1.
+async function initSessions() {
+  let list = [];
+  try { list = await (await fetch('/sessions')).json(); } catch { /* offline */ }
+  const params = new URLSearchParams(location.search);
+  const wanted = params.get('session');
+  const start = (list.find(s => s.id === wanted) || list[0] || {}).id || 'default';
+
+  const sel = $('#session-select');
+  if (list.length > 1) {
+    sel.innerHTML = list.map(s => {
+      const label = `${s.title}${s.agent ? ` · ${s.agent}` : ''} · ${s.events} ev`;
+      return `<option value="${esc(s.id)}">${esc(label)}</option>`;
+    }).join('');
+    sel.value = start;
+    sel.hidden = false;
+    $('#session-title').hidden = true;
+    sel.addEventListener('change', () => {
+      const p = new URLSearchParams(location.search);
+      p.set('session', sel.value); p.delete('at');
+      history.replaceState(null, '', `?${p}`);
+      connect(sel.value);
+    });
   }
-};
-
-es.addEventListener('ready', () => {
-  ready = true;
-  state = fold(log);
-  cursor = log.length;
-  vt = log.length ? log[log.length - 1].t : Date.now();
-  renderAll(false);
-  // deep link into the tape: ?at=0.45 (fraction) or ?at=620 (seconds from start)
-  // Fractions map over the recorded event span, not the live domain — an old
-  // tape's idle gap shouldn't dilute them.
-  const at = new URLSearchParams(location.search).get('at');
-  if (at != null && log.length) {
-    const t0 = log[0].t, t1 = log[log.length - 1].t;
-    const v = parseFloat(at);
-    if (!Number.isNaN(v)) scrubTo(v <= 1 ? t0 + v * (t1 - t0) : t0 + v * 1000);
-  }
-});
-
-es.onerror = () => { $('#status-text').textContent = 'RECONNECTING'; };
+  connect(start);
+}
 
 function goLive() {
   live = true; playing = false;
@@ -663,7 +710,7 @@ $('#add-card-form').addEventListener('submit', async e => {
   const title = input.value.trim();
   if (!title) return;
   input.value = '';
-  await fetch('/event', {
+  await fetch('/event?session=' + encodeURIComponent(sessionId || ''), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -698,3 +745,4 @@ setInterval(() => {
 }, 1000);
 
 sizeCanvas();
+initSessions();

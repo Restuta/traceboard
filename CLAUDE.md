@@ -24,7 +24,9 @@ including the ones building it.
 ## Layout
 
 - `server.js` — zero-dep static + SSE server; tails the log, broadcasts
-  appends; `POST /event` appends (stamps `t` if missing).
+  appends; `POST /event` appends (stamps `t` if missing). Serves multiple
+  sessions via repeated `--log` or `--dir`; `GET /sessions` lists them and
+  `/sse?session=` / `/event?session=` scope to one.
 - `public/` — the board. `reducer.js` (pure fold), `app.js` (render, FLIP
   animations, tickers, replay engine), `style.css`, `index.html`.
 - `hooks/claude-hook.js` — single entrypoint for all Claude Code hooks; routes
