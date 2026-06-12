@@ -217,7 +217,14 @@ function parseCodex(lines) {
     }
 
     if (e.type === 'response_item') {
-      if (p.type === 'function_call') {
+      if (p.type === 'function_call' && p.name === 'update_plan') {
+        let plan = [];
+        try { plan = JSON.parse(p.arguments || '{}').plan || []; } catch { /* skip */ }
+        r.events.push({
+          t, type: 'todos', ...(card ? { item: card } : {}),
+          todos: plan.map(s => ({ text: s.step, done: s.status === 'completed' })),
+        });
+      } else if (p.type === 'function_call') {
         lastActivityT = t;
         let cmd = '';
         try { cmd = JSON.parse(p.arguments || '{}').cmd || ''; } catch { /* not json */ }

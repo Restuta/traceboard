@@ -175,7 +175,16 @@ function step(e) {
   }
 
   if (e.type === 'response_item') {
-    if (p.type === 'function_call') {
+    if (p.type === 'function_call' && p.name === 'update_plan') {
+      // Codex's plan == the board's todo drill-in. Attach it to the current
+      // turn's card so an in-progress card shows live steps + a progress ring.
+      let plan = [];
+      try { plan = JSON.parse(p.arguments || '{}').plan || []; } catch { /* skip */ }
+      out.push({
+        t, type: 'todos', ...(state.card ? { item: state.card } : {}),
+        todos: plan.map(s => ({ text: s.step, done: s.status === 'completed' })),
+      });
+    } else if (p.type === 'function_call') {
       let cmd = '';
       try { cmd = JSON.parse(p.arguments || '{}').cmd || ''; } catch { /* not json */ }
       if (/git\s+.*commit/.test(cmd)) state.pending.set(p.call_id, t);
