@@ -203,6 +203,20 @@ export function reduce(state, ev) {
       break;
     }
 
+    case 'tool': {
+      // The agent ran a command (read a file, ran tests). Activity, not a file
+      // change — it warms the active card and scrolls the tape so a working
+      // turn looks alive between edits.
+      state.totals.tools = (state.totals.tools || 0) + 1;
+      const it = targetItem(state, ev);
+      if (it) { it.tools = (it.tools || 0) + 1; it.touchedAt = ev.t; }
+      if (state.session.phase === 'attention') {
+        state.session.phase = 'working';
+        state.session.attentionText = null;
+      }
+      break;
+    }
+
     case 'usage': {
       // Token accounting, emitted per model turn (mostly by the importer —
       // live hooks have no token visibility). Drives the masthead meters.

@@ -563,6 +563,9 @@ body.tape-collapsed .tape { border-left: none; }
 .feed .tag.ci-fail{ color: var(--red); }
 .feed .tag.note   { color: var(--merged); }
 .feed .tag.item   { color: var(--dim); }
+.feed .tag.tool   { color: var(--faint); }
+
+.feed .tx .cmd { color: var(--dim); opacity: .85; }
 
 .feed .tx { color: var(--dim); word-break: break-word; }
 .feed .tx b { color: var(--ink); font-weight: 500; }

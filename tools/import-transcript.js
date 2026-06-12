@@ -228,7 +228,10 @@ function parseCodex(lines) {
         lastActivityT = t;
         let cmd = '';
         try { cmd = JSON.parse(p.arguments || '{}').cmd || ''; } catch { /* not json */ }
-        if (/git .*commit/.test(cmd)) pendingCommitCalls.set(p.call_id, t);
+        if (cmd) {
+          r.events.push({ t, type: 'tool', tool: 'run', text: cmd.replace(/\s+/g, ' ').trim().slice(0, 120), ...(card ? { item: card } : {}) });
+          if (/git .*commit/.test(cmd)) pendingCommitCalls.set(p.call_id, t);
+        }
       } else if (p.type === 'function_call_output' && pendingCommitCalls.has(p.call_id)) {
         const callT = pendingCommitCalls.get(p.call_id);
         pendingCommitCalls.delete(p.call_id);

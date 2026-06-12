@@ -187,7 +187,11 @@ function step(e) {
     } else if (p.type === 'function_call') {
       let cmd = '';
       try { cmd = JSON.parse(p.arguments || '{}').cmd || ''; } catch { /* not json */ }
-      if (/git\s+.*commit/.test(cmd)) state.pending.set(p.call_id, t);
+      if (cmd) {
+        // Surface the command as activity so a working turn scrolls the tape.
+        out.push({ t, type: 'tool', tool: 'run', text: cmd.replace(/\s+/g, ' ').trim().slice(0, 120), ...(state.card ? { item: state.card } : {}) });
+        if (/git\s+.*commit/.test(cmd)) state.pending.set(p.call_id, t);
+      }
     } else if (p.type === 'function_call_output' && state.pending.has(p.call_id)) {
       const ct = state.pending.get(p.call_id);
       state.pending.delete(p.call_id);

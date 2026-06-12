@@ -531,6 +531,11 @@ function feedLine(ev) {
       cls = ev.status === 'fail' ? 'ci-fail' : 'ci';
       tx = `checks ${esc(ev.status)}`;
       break;
+    case 'tool': {
+      tag = ev.tool || 'run'; cls = 'tool';
+      tx = `<span class="cmd">${esc(ev.text || '')}</span>`;
+      break;
+    }
     case 'note':
       tx = esc(ev.text || '');
       break;
