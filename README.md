@@ -57,31 +57,37 @@ The corollary (see [docs/EVENTS.md](docs/EVENTS.md)) is that external facts —
 CI status, PR state — are *recorded as events*, never fetched at render time.
 Replaying yesterday's session must show yesterday's CI status.
 
-## Opt-in recording for any project (global install)
+## `/nightshift` — record a session on demand
 
-To record the occasional session in any project — without attaching each one,
-and without slowing down the sessions you *don't* record:
+Install once, then type `/nightshift` inside any Claude Code session to start
+recording *that* session — and nothing else:
 
 ```sh
-node tools/install-global.js          # one-time: register gated hooks
-NIGHTSHIFT=1 claude                    # this session records
-claude                                 # this session does not
+node tools/install-global.js              # one-time setup
+# …then in any session:
+/nightshift                               # this session starts recording
+/nightshift off                           # stop
 node server.js --dir ~/.nightshift/sessions   # one board, a tab per project
 ```
 
-The hooks are registered in your global `~/.claude/settings.json` (additively —
-it backs the file up first and never clobbers existing hooks) but **gated on
-the `NIGHTSHIFT` env var**. When it's unset, the hook is a one-line shell test
-that exits before launching `node` — a few milliseconds, imperceptible — so
-normal sessions pay almost nothing. Only a session you launch with
-`NIGHTSHIFT=1` actually records.
+The one-time install registers nightshift's hooks in your global
+`~/.claude/settings.json` (additively — it backs the file up first and never
+clobbers existing hooks) and drops a `/nightshift` skill into
+`~/.claude/skills/`. The hooks are **dormant by default**: `/nightshift` writes
+a per-session marker (`~/.nightshift/active/<session-id>`) and the hooks record
+only the session that has one.
+
+**Sessions you don't opt in pay almost nothing.** When no session is recording,
+the hook command is a couple of shell built-ins that exit before launching
+`node` — sub-millisecond, imperceptible. `node` runs only for a session that's
+actually recording. (Prefer launch-time? `NIGHTSHIFT=1 claude` works too.)
 
 Events route to a central per-project log under
 `~/.nightshift/sessions/<project>.jsonl`, so **nothing is written inside your
 repos**, and the session switcher lists every project. Commits are captured
 from the agent's own `git commit` output, so **no global git config is
 touched** (a global `core.hooksPath` would override per-repo hooks like Husky).
-Undo any time with `node tools/install-global.js --remove`.
+Undo everything with `node tools/install-global.js --remove`.
 
 Projects you explicitly `attach` (below) record every session unconditionally
 and keep their own local log — use one mode or the other per project, not both.

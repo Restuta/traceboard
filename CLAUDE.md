@@ -40,13 +40,20 @@ including the ones building it.
 - `tools/attach.js` — one-command wiring into another project: vendors the
   hook kit into `<target>/.nightshift/`, merges `.claude/settings.json`,
   installs the git hook. Idempotent.
-- `tools/install-global.js` — register hooks in *global* `~/.claude/settings.json`,
-  gated on `$NIGHTSHIFT` so recording is opt-in per session (`NIGHTSHIFT=1
-  claude`); the gate is a shell test in the hook command, so non-recording
-  sessions never spawn node. Events route to central per-project logs under
-  `~/.nightshift/sessions/` (no per-repo files, no git config). The hook
-  (`claude-hook.js`) resolves local-vs-central and, in central mode only,
-  captures commits from Bash output so attached projects aren't double-counted.
+- `tools/install-global.js` — one-time setup for on-demand recording: registers
+  gated hooks in *global* `~/.claude/settings.json`, installs the `/nightshift`
+  skill to `~/.claude/skills/`, writes `~/.nightshift/install.json`. Recording
+  is opt-in **per session**: `/nightshift` creates `~/.nightshift/active/<sid>`
+  and the hooks record only marked sessions. The shell pre-gate spawns node only
+  when a session is recording; `claude-hook.js`'s `recording()` makes the
+  authoritative per-session decision from the payload's `session_id`. Events go
+  to central per-project logs under `~/.nightshift/sessions/` (no per-repo files,
+  no git config); central mode captures commits from Bash output so attached
+  projects aren't double-counted. `--remove` undoes it all.
+- `skills/nightshift/SKILL.md` — the `/nightshift` skill (deployed by the
+  installer): toggles the per-session marker, emits the opening session event.
+- `tools/resolve-log.js` — prints the log path `claude-hook.js` would use for the
+  cwd, so the skill emits to / tails the right file.
 - `tools/poll-github.js` — records PR/CI facts as events via gh; folds the
   log's known state each tick and appends only deltas (stateless, idempotent).
 - `demo/generate.js` — synthesizes a realistic session log for demos and UI work.

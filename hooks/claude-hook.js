@@ -9,6 +9,7 @@ const os = require('os');
 const path = require('path');
 
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+const NS_HOME = process.env.NIGHTSHIFT_HOME || path.join(os.homedir(), '.nightshift');
 
 // Where this project's events go:
 //   1. $NIGHTSHIFT_LOG                          — explicit override
@@ -20,12 +21,23 @@ function resolveLog() {
   if (process.env.NIGHTSHIFT_LOG) return { log: process.env.NIGHTSHIFT_LOG, central: false };
   const localDir = path.join(root, '.nightshift');
   if (fs.existsSync(localDir)) return { log: path.join(localDir, 'events.jsonl'), central: false };
-  const home = process.env.NIGHTSHIFT_HOME || path.join(os.homedir(), '.nightshift');
   const slug = root.replace(/^\/+/, '').replace(/[^A-Za-z0-9._-]+/g, '-') || 'session';
-  return { log: path.join(home, 'sessions', `${slug}.jsonl`), central: true };
+  return { log: path.join(NS_HOME, 'sessions', `${slug}.jsonl`), central: true };
 }
 
 const { log: LOG, central: CENTRAL } = resolveLog();
+
+// Recording gate for central (global-install) sessions. Attached projects
+// (local .nightshift) always record; a central session records only when opted
+// in — the NIGHTSHIFT env var, or a per-session marker that the /nightshift
+// skill created. We key the marker on the payload's session_id (documented),
+// not an env var, so this is authoritative even if the shell pre-gate let a
+// non-opted session through.
+function recording(hook) {
+  if (!CENTRAL || process.env.NIGHTSHIFT) return true;
+  const sid = hook.session_id;
+  return !!(sid && fs.existsSync(path.join(NS_HOME, 'active', sid)));
+}
 
 function append(ev) {
   fs.mkdirSync(path.dirname(LOG), { recursive: true });
@@ -45,6 +57,8 @@ function main() {
   try { input = fs.readFileSync(0, 'utf8'); } catch { return; }
   let hook;
   try { hook = JSON.parse(input); } catch { return; }
+
+  if (!recording(hook)) return; // central session that hasn't opted in
 
   const name = hook.hook_event_name;
 

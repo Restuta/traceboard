@@ -1,23 +1,25 @@
 #!/usr/bin/env node
-// Enable *opt-in, per-session* recording for any project, without attaching to
-// each one. Registers nightshift's hooks in your global ~/.claude/settings.json
-// but gates them behind the NIGHTSHIFT env var, so they stay dormant until you
-// ask for them:
+// One-time setup for the /nightshift skill: register nightshift's hooks in your
+// global ~/.claude/settings.json, gated so they're dormant until you opt a
+// session in. You then start recording from inside any session by typing:
 //
-//   NIGHTSHIFT=1 claude        # this session records
-//   claude                     # this session does NOT (hook is a no-op)
+//   /nightshift            # records THIS session (creates a per-session marker)
+//   /nightshift off        # stops it
 //
-// Cost when off: Claude Code runs the hook command, but it's a one-line shell
-// test that exits before spawning node — a few ms, imperceptible. Only an
-// opted-in session pays for node + logging. Events route to a central
-// per-project log under ~/.nightshift/sessions/ (nothing inside your repos).
+// You can also opt in at launch with `NIGHTSHIFT=1 claude`.
+//
+// Cost when a session is NOT recording: Claude Code runs the hook command, but
+// it's a one-line shell test that exits before spawning node — sub-millisecond,
+// imperceptible. Only a session you've turned on pays for node + logging.
+// Events route to a central per-project log under ~/.nightshift/sessions/
+// (nothing inside your repos).
 //
 //   node tools/install-global.js          # install / update (idempotent)
 //   node tools/install-global.js --remove # uninstall
 //
 // Projects you explicitly `attach` keep their own local .nightshift/ log, always
 // record, and take precedence. No git config is touched (a global
-// core.hooksPath would override per-repo hooks like Husky), so in opted-in
+// core.hooksPath would override per-repo hooks like Husky), so in recording
 // sessions commits are captured from the agent's Bash output instead.
 
 const fs = require('fs');
@@ -28,12 +30,26 @@ const remove = process.argv.includes('--remove');
 const here = path.resolve(__dirname, '..');
 const HOOK = path.join(here, 'hooks', 'claude-hook.js');
 const MARK = 'hooks/claude-hook.js'; // identifies our hook command on re-runs
-const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-const sessionsDir = path.join(os.homedir(), '.nightshift', 'sessions');
+const home = os.homedir();
+const settingsPath = path.join(home, '.claude', 'settings.json');
+const nsHome = path.join(home, '.nightshift');
+const sessionsDir = path.join(nsHome, 'sessions');
+const activeDir = path.join(nsHome, 'active');
+const skillDir = path.join(home, '.claude', 'skills', 'nightshift');
 
-// Shell-gated: when NIGHTSHIFT is empty/unset the `[ -n ]` test is false and the
-// command short-circuits to `true` (exit 0) without ever launching node.
-const CMD = `[ -n "$NIGHTSHIFT" ] && node "${HOOK}" || true`;
+// Cheap shell pre-gate — spawns node only when a session might be recording:
+//   - NIGHTSHIFT env set at launch, OR
+//   - this session's marker exists (when $CLAUDE_CODE_SESSION_ID is in the
+//     hook env — the fast, fully per-session path), OR
+//   - that env var is absent but *some* session has a marker, so node must
+//     check the payload's session_id to decide (claude-hook's `recording()`).
+// When nothing is recording, this is a couple of `[` builtins and an empty-dir
+// `ls` — no node. `if … then node … fi; true` keeps the exit code 0.
+const CMD =
+  'if [ -n "$NIGHTSHIFT" ] ' +
+  '|| { [ -n "$CLAUDE_CODE_SESSION_ID" ] && [ -e "$HOME/.nightshift/active/$CLAUDE_CODE_SESSION_ID" ]; } ' +
+  '|| { [ -z "$CLAUDE_CODE_SESSION_ID" ] && [ -n "$(ls -A "$HOME/.nightshift/active" 2>/dev/null)" ]; }; ' +
+  `then node "${HOOK}"; fi; true`;
 const EVENTS = {
   SessionStart: null, UserPromptSubmit: null, Stop: null, Notification: null,
   PostToolUse: 'Edit|Write|MultiEdit|NotebookEdit|TodoWrite|Bash',
@@ -53,6 +69,16 @@ function isOurs(group) {
   return (group.hooks || []).some(h => (h.command || '').includes(MARK));
 }
 
+// Recursively copy a directory (the skill) with no deps.
+function copyDir(src, dst) {
+  fs.mkdirSync(dst, { recursive: true });
+  for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, ent.name), d = path.join(dst, ent.name);
+    if (ent.isDirectory()) copyDir(s, d);
+    else fs.copyFileSync(s, d);
+  }
+}
+
 if (remove) {
   let removed = 0;
   for (const event of Object.keys(settings.hooks)) {
@@ -62,8 +88,10 @@ if (remove) {
     if (!settings.hooks[event].length) delete settings.hooks[event];
   }
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-  console.log(`nightshift global hooks removed (${removed} group(s)) from ${settingsPath}`);
-  console.log(`Central logs left in place at ${sessionsDir} — delete them by hand if you want.`);
+  fs.rmSync(skillDir, { recursive: true, force: true });
+  fs.rmSync(path.join(nsHome, 'install.json'), { force: true });
+  console.log(`nightshift removed: ${removed} hook group(s) from ${settingsPath}, /nightshift skill, install.json`);
+  console.log(`Recorded tapes left in place at ${sessionsDir} — delete them by hand if you want.`);
   process.exit(0);
 }
 
@@ -85,13 +113,24 @@ for (const [event, matcher] of Object.entries(EVENTS)) {
 fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 fs.mkdirSync(sessionsDir, { recursive: true });
+fs.mkdirSync(activeDir, { recursive: true });
 
-console.log(`nightshift hooks registered in ${settingsPath} (opt-in, gated on $NIGHTSHIFT)`);
-console.log(`central logs:  ${sessionsDir}/<project>.jsonl  (one per project)`);
+// Install the /nightshift skill globally and record paths for it to read.
+copyDir(path.join(here, 'skills', 'nightshift'), skillDir);
+fs.writeFileSync(path.join(nsHome, 'install.json'), JSON.stringify({
+  repo: here,
+  server: path.join(here, 'server.js'),
+  emit: path.join(here, 'tools', 'emit.js'),
+  resolveLog: path.join(here, 'tools', 'resolve-log.js'),
+}, null, 2) + '\n');
+
+console.log(`nightshift installed:`);
+console.log(`  hooks  → ${settingsPath} (dormant until a session opts in)`);
+console.log(`  skill  → ${skillDir}  (use /nightshift in any session)`);
+console.log(`  tapes  → ${sessionsDir}/<project>.jsonl`);
 console.log('');
-console.log('Record a session by launching it with the env var:');
-console.log('  NIGHTSHIFT=1 claude          # this session records; plain `claude` does not');
-console.log("  alias nsclaude='NIGHTSHIFT=1 claude'   # optional convenience");
+console.log('In any session, start recording with:  /nightshift   (stop: /nightshift off)');
+console.log('Sessions where you never type it are unaffected (a sub-ms shell test, no node).');
 console.log('');
 console.log('Watch your recorded sessions (one tab per project):');
 console.log(`  node "${path.join(here, 'server.js')}" --dir "${sessionsDir}"`);
