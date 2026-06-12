@@ -1,17 +1,24 @@
 #!/usr/bin/env node
-// Record every Claude Code session you run, in any project, automatically —
-// without attaching to each one. Merges nightshift's hooks into your *global*
-// ~/.claude/settings.json so they fire in all sessions, and routes each
-// project's events to a central per-project log under ~/.nightshift/sessions/
-// (nothing is written inside your repos).
+// Enable *opt-in, per-session* recording for any project, without attaching to
+// each one. Registers nightshift's hooks in your global ~/.claude/settings.json
+// but gates them behind the NIGHTSHIFT env var, so they stay dormant until you
+// ask for them:
+//
+//   NIGHTSHIFT=1 claude        # this session records
+//   claude                     # this session does NOT (hook is a no-op)
+//
+// Cost when off: Claude Code runs the hook command, but it's a one-line shell
+// test that exits before spawning node — a few ms, imperceptible. Only an
+// opted-in session pays for node + logging. Events route to a central
+// per-project log under ~/.nightshift/sessions/ (nothing inside your repos).
 //
 //   node tools/install-global.js          # install / update (idempotent)
 //   node tools/install-global.js --remove # uninstall
 //
-// Projects you explicitly `attach` still keep their own local .nightshift/ log
-// and take precedence; everything else lands centrally. No git config is
-// touched (a global core.hooksPath would override per-repo hooks like Husky),
-// so commits are captured from the agent's Bash output instead.
+// Projects you explicitly `attach` keep their own local .nightshift/ log, always
+// record, and take precedence. No git config is touched (a global
+// core.hooksPath would override per-repo hooks like Husky), so in opted-in
+// sessions commits are captured from the agent's Bash output instead.
 
 const fs = require('fs');
 const os = require('os');
@@ -24,7 +31,9 @@ const MARK = 'hooks/claude-hook.js'; // identifies our hook command on re-runs
 const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
 const sessionsDir = path.join(os.homedir(), '.nightshift', 'sessions');
 
-const CMD = `node "${HOOK}"`;
+// Shell-gated: when NIGHTSHIFT is empty/unset the `[ -n ]` test is false and the
+// command short-circuits to `true` (exit 0) without ever launching node.
+const CMD = `[ -n "$NIGHTSHIFT" ] && node "${HOOK}" || true`;
 const EVENTS = {
   SessionStart: null, UserPromptSubmit: null, Stop: null, Notification: null,
   PostToolUse: 'Edit|Write|MultiEdit|NotebookEdit|TodoWrite|Bash',
@@ -63,25 +72,28 @@ if (fs.existsSync(settingsPath) && !fs.existsSync(settingsPath + '.nightshift-ba
   fs.copyFileSync(settingsPath, settingsPath + '.nightshift-bak');
 }
 
-let wired = 0;
+// Drop any prior version of our group first, then add the current one — this
+// makes re-runs idempotent and migrates an older (e.g. ungated) command.
 for (const [event, matcher] of Object.entries(EVENTS)) {
-  const groups = settings.hooks[event] = settings.hooks[event] || [];
-  if (groups.some(isOurs)) continue; // already installed — leave as is
+  const groups = (settings.hooks[event] || []).filter(g => !isOurs(g));
   const group = { hooks: [{ type: 'command', command: CMD }] };
   if (matcher) group.matcher = matcher;
   groups.push(group);
-  wired++;
+  settings.hooks[event] = groups;
 }
 
 fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
 fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 fs.mkdirSync(sessionsDir, { recursive: true });
 
-console.log(`nightshift global install ${wired ? `— ${wired} hook(s) merged into` : '— already wired in'} ${settingsPath}`);
+console.log(`nightshift hooks registered in ${settingsPath} (opt-in, gated on $NIGHTSHIFT)`);
 console.log(`central logs:  ${sessionsDir}/<project>.jsonl  (one per project)`);
 console.log('');
-console.log('Start a NEW Claude Code session in any project — it records automatically.');
-console.log('Watch all of them with the session switcher:');
+console.log('Record a session by launching it with the env var:');
+console.log('  NIGHTSHIFT=1 claude          # this session records; plain `claude` does not');
+console.log("  alias nsclaude='NIGHTSHIFT=1 claude'   # optional convenience");
+console.log('');
+console.log('Watch your recorded sessions (one tab per project):');
 console.log(`  node "${path.join(here, 'server.js')}" --dir "${sessionsDir}"`);
 console.log('');
 console.log('Uninstall:  node tools/install-global.js --remove');

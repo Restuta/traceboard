@@ -57,28 +57,34 @@ The corollary (see [docs/EVENTS.md](docs/EVENTS.md)) is that external facts —
 CI status, PR state — are *recorded as events*, never fetched at render time.
 Replaying yesterday's session must show yesterday's CI status.
 
-## Record every session (global install)
+## Opt-in recording for any project (global install)
 
-To watch all your normal Claude Code sessions, in any project, with no
-per-project setup:
+To record the occasional session in any project — without attaching each one,
+and without slowing down the sessions you *don't* record:
 
 ```sh
-node tools/install-global.js
-node server.js --dir ~/.nightshift/sessions   # one board, a switcher per project
+node tools/install-global.js          # one-time: register gated hooks
+NIGHTSHIFT=1 claude                    # this session records
+claude                                 # this session does not
+node server.js --dir ~/.nightshift/sessions   # one board, a tab per project
 ```
 
-This merges nightshift's hooks into your global `~/.claude/settings.json`
-(additively — it backs the file up first and never clobbers existing hooks).
-Each project's events route to a central per-project log under
-`~/.nightshift/sessions/<project>.jsonl`, so **nothing is written inside your
-repos**. Start a *new* session in any project and it records itself; the
-session switcher lists them all. Commits are captured from the agent's own
-`git commit` output, so **no global git config is touched** (a global
-`core.hooksPath` would override per-repo hooks like Husky). Undo any time with
-`node tools/install-global.js --remove`.
+The hooks are registered in your global `~/.claude/settings.json` (additively —
+it backs the file up first and never clobbers existing hooks) but **gated on
+the `NIGHTSHIFT` env var**. When it's unset, the hook is a one-line shell test
+that exits before launching `node` — a few milliseconds, imperceptible — so
+normal sessions pay almost nothing. Only a session you launch with
+`NIGHTSHIFT=1` actually records.
 
-Projects you explicitly `attach` (below) keep their own local log and take
-precedence — use one mode or the other per project, not both.
+Events route to a central per-project log under
+`~/.nightshift/sessions/<project>.jsonl`, so **nothing is written inside your
+repos**, and the session switcher lists every project. Commits are captured
+from the agent's own `git commit` output, so **no global git config is
+touched** (a global `core.hooksPath` would override per-repo hooks like Husky).
+Undo any time with `node tools/install-global.js --remove`.
+
+Projects you explicitly `attach` (below) record every session unconditionally
+and keep their own local log — use one mode or the other per project, not both.
 
 ## Attaching a single project
 
