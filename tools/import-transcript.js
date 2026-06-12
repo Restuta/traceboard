@@ -158,7 +158,7 @@ function parseCodex(lines) {
     sessionId: null, cwd: null, title: null,
     firstT: null, lastT: null, prompts: 0, edits: 0,
   };
-  let lastActivityT = null, phase = null, model = null;
+  let lastActivityT = null, phase = null, model = null, turnN = 0, card = null;
   const pendingCommitCalls = new Map(); // call_id → t of the exec call
 
   for (const line of lines) {
@@ -179,20 +179,26 @@ function parseCodex(lines) {
 
     if (e.type === 'event_msg') {
       if (p.type === 'user_message') {
-        if (!r.title && p.message) r.title = String(p.message).trim().split('\n')[0].slice(0, 64).trim();
+        const line = p.message ? String(p.message).trim().split('\n')[0].slice(0, 64).trim() : null;
+        if (!r.title && line) r.title = line;
         if (phase === 'working' && lastActivityT != null) {
           r.events.push({ t: lastActivityT, type: 'session', phase: 'idle' });
         }
+        // One card per turn — Codex has no intent layer, so derive it.
+        if (card) r.events.push({ t, type: 'item', id: card, status: 'done' });
+        card = `turn-${++turnN}`;
+        r.events.push({ t, type: 'item', id: card, title: line || `turn ${turnN}`, status: 'doing' });
         r.events.push({ t, type: 'session', phase: 'resume' });
         phase = 'working';
         r.prompts++;
       } else if (p.type === 'task_complete') {
+        if (card) { r.events.push({ t, type: 'item', id: card, status: 'done' }); card = null; }
         r.events.push({ t, type: 'session', phase: 'idle' });
         phase = 'idle';
       } else if (p.type === 'patch_apply_end' && p.success && p.changes) {
         lastActivityT = t;
         for (const file of Object.keys(p.changes)) {
-          r.events.push({ t, type: 'edit', path: path.relative(r.cwd || '.', file), tool: 'apply_patch' });
+          r.events.push({ t, type: 'edit', path: path.relative(r.cwd || '.', file), tool: 'apply_patch', ...(card ? { item: card } : {}) });
           r.edits++;
         }
       } else if (p.type === 'token_count' && p.info && p.info.last_token_usage) {
@@ -220,7 +226,7 @@ function parseCodex(lines) {
         const callT = pendingCommitCalls.get(p.call_id);
         pendingCommitCalls.delete(p.call_id);
         const c = parseCommitOutput(String(p.output || ''), callT);
-        if (c) r.parsedCommits.push(c);
+        if (c) { if (card) c.item = card; r.parsedCommits.push(c); }
       }
     }
   }

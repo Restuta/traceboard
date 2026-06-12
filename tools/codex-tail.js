@@ -107,6 +107,7 @@ if (!worker && !once) {
 
 const state = {
   phase: null, model: null, lastActivityT: null, started: false, titled: false,
+  turnN: 0, card: null, // one card per turn (prompt)
   pending: new Map(), // call_id → t
 };
 
@@ -140,17 +141,26 @@ function step(e) {
 
   if (e.type === 'event_msg') {
     if (p.type === 'user_message') {
+      // Codex has no intent layer, so each prompt (turn) becomes a card: the
+      // current turn sits in "in progress" and moves to "done" when the next
+      // prompt arrives or the turn completes. Edits/commits in between attach
+      // to it, so the board isn't an empty grid of facts-only.
       const title = p.message ? String(p.message).trim().split('\n')[0].slice(0, 64).trim() : null;
+      if (state.card) out.push({ t, type: 'item', id: state.card, status: 'done' });
+      state.turnN++;
+      state.card = `turn-${state.turnN}`;
+      out.push({ t, type: 'item', id: state.card, title: title || `turn ${state.turnN}`, status: 'doing' });
       out.push({ t, type: 'session', phase: 'resume', agent: 'codex', ...(state.titled ? {} : { title }) });
       state.titled = true;
       state.phase = 'working';
     } else if (p.type === 'task_complete') {
+      if (state.card) { out.push({ t, type: 'item', id: state.card, status: 'done' }); state.card = null; }
       out.push({ t, type: 'session', phase: 'idle' });
       state.phase = 'idle';
     } else if (p.type === 'patch_apply_end' && p.success && p.changes) {
       state.lastActivityT = t;
       for (const file of Object.keys(p.changes)) {
-        out.push({ t, type: 'edit', path: relCwd(file), tool: 'apply_patch' });
+        out.push({ t, type: 'edit', path: relCwd(file), tool: 'apply_patch', ...(state.card ? { item: state.card } : {}) });
       }
     } else if (p.type === 'token_count' && p.info && p.info.last_token_usage) {
       const u = p.info.last_token_usage;
@@ -172,7 +182,7 @@ function step(e) {
       const ct = state.pending.get(p.call_id);
       state.pending.delete(p.call_id);
       const c = parseCommitOutput(String(p.output || ''), ct);
-      if (c) out.push(c);
+      if (c) { if (state.card) c.item = state.card; out.push(c); }
     }
   }
   return out;
