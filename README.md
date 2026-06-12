@@ -63,19 +63,23 @@ Install once, then type `/nightshift` inside any Claude Code session to start
 recording *that* session — and nothing else:
 
 ```sh
-node tools/install-global.js              # one-time setup
+node tools/install-global.js     # one-time setup
 # …then in any session:
-/nightshift                               # this session starts recording
-/nightshift off                           # stop
-node server.js --dir ~/.nightshift/sessions   # one board, a tab per project
+/nightshift                      # records this session + opens the board
+/nightshift off                  # stop
 ```
+
+`/nightshift` does it all: marks the session, starts the board server (once,
+detached — reused after that), and opens it in your browser at the right tab.
 
 The one-time install registers nightshift's hooks in your global
 `~/.claude/settings.json` (additively — it backs the file up first and never
-clobbers existing hooks) and drops a `/nightshift` skill into
-`~/.claude/skills/`. The hooks are **dormant by default**: `/nightshift` writes
-a per-session marker (`~/.nightshift/active/<session-id>`) and the hooks record
-only the session that has one.
+clobbers existing hooks) and **symlinks** a `/nightshift` skill into
+`~/.claude/skills/`. Because it's a symlink, pulling repo updates needs no
+reinstall — only changes to the hook wiring itself do. The hooks are **dormant
+by default**: `/nightshift` writes a per-session marker
+(`~/.nightshift/active/<session-id>`) and the hooks record only the session
+that has one.
 
 **Sessions you don't opt in pay almost nothing.** When no session is recording,
 the hook command is a couple of shell built-ins that exit before launching

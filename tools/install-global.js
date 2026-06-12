@@ -69,14 +69,13 @@ function isOurs(group) {
   return (group.hooks || []).some(h => (h.command || '').includes(MARK));
 }
 
-// Recursively copy a directory (the skill) with no deps.
-function copyDir(src, dst) {
-  fs.mkdirSync(dst, { recursive: true });
-  for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
-    const s = path.join(src, ent.name), d = path.join(dst, ent.name);
-    if (ent.isDirectory()) copyDir(s, d);
-    else fs.copyFileSync(s, d);
-  }
+// Remove whatever is at the skill path — a symlink (unlink) or an older
+// copy-install (recursive rm) — so install/remove handle both.
+function clearSkill() {
+  try {
+    if (fs.lstatSync(skillDir).isSymbolicLink()) fs.unlinkSync(skillDir);
+    else fs.rmSync(skillDir, { recursive: true, force: true });
+  } catch { /* not there */ }
 }
 
 if (remove) {
@@ -88,7 +87,7 @@ if (remove) {
     if (!settings.hooks[event].length) delete settings.hooks[event];
   }
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-  fs.rmSync(skillDir, { recursive: true, force: true });
+  clearSkill();
   fs.rmSync(path.join(nsHome, 'install.json'), { force: true });
   console.log(`nightshift removed: ${removed} hook group(s) from ${settingsPath}, /nightshift skill, install.json`);
   console.log(`Recorded tapes left in place at ${sessionsDir} — delete them by hand if you want.`);
@@ -115,8 +114,11 @@ fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 fs.mkdirSync(sessionsDir, { recursive: true });
 fs.mkdirSync(activeDir, { recursive: true });
 
-// Install the /nightshift skill globally and record paths for it to read.
-copyDir(path.join(here, 'skills', 'nightshift'), skillDir);
+// Symlink the /nightshift skill (not copy) so repo edits — and `git pull` —
+// are live with no reinstall. Record paths for the skill to read.
+clearSkill();
+fs.mkdirSync(path.dirname(skillDir), { recursive: true });
+fs.symlinkSync(path.join(here, 'skills', 'nightshift'), skillDir, 'dir');
 fs.writeFileSync(path.join(nsHome, 'install.json'), JSON.stringify({
   repo: here,
   server: path.join(here, 'server.js'),

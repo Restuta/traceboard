@@ -50,10 +50,15 @@ including the ones building it.
   to central per-project logs under `~/.nightshift/sessions/` (no per-repo files,
   no git config); central mode captures commits from Bash output so attached
   projects aren't double-counted. `--remove` undoes it all.
-- `skills/nightshift/SKILL.md` — the `/nightshift` skill (deployed by the
-  installer): toggles the per-session marker, emits the opening session event.
+- `skills/nightshift/SKILL.md` — the `/nightshift` skill (symlinked into
+  `~/.claude/skills/` by the installer, so repo edits are live without a
+  reinstall): toggles the per-session marker, emits the opening event, opens the
+  board.
 - `tools/resolve-log.js` — prints the log path `claude-hook.js` would use for the
   cwd, so the skill emits to / tails the right file.
+- `tools/board.js` — ensures one detached board server is running (serving
+  `~/.nightshift/sessions`), reused across sessions via `~/.nightshift/board.json`;
+  prints the URL and, with `--open`, opens the browser at `?session=<slug>`.
 - `tools/poll-github.js` — records PR/CI facts as events via gh; folds the
   log's known state each tick and appends only deltas (stateless, idempotent).
 - `demo/generate.js` — synthesizes a realistic session log for demos and UI work.

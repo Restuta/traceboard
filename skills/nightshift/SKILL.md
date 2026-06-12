@@ -20,9 +20,10 @@ edit `~/.claude/settings.json` yourself.
 Parse the argument (default is `on`):
 
 ## `/nightshift` or `/nightshift on`
-Start recording this session.
+Start recording this session and open the board.
 
-1. Resolve the marker + log:
+1. Mark the session, emit the opening event, and bring up the board — all in
+   one block:
    ```sh
    SID="$CLAUDE_CODE_SESSION_ID"
    REPO=$(node -e 'console.log(require(require("os").homedir()+"/.nightshift/install.json").repo)')
@@ -30,12 +31,15 @@ Start recording this session.
    mkdir -p ~/.nightshift/active && touch ~/.nightshift/active/"$SID"
    node "$REPO/tools/emit.js" session --phase start --agent claude \
      --title "$(basename "$PWD")" --cwd "$PWD" --log "$LOG"
+   node "$REPO/tools/board.js" --open --session "$(basename "$LOG" .jsonl)"
    ```
-2. From here on, every edit/todo/commit this session makes is recorded to
-   `$LOG`. Tell the user recording is **on for this session only**, and give
-   them the watch command:
-   `node <server> --dir ~/.nightshift/sessions` → open http://localhost:4173.
-3. Mention they can stop with `/nightshift off`.
+   `board.js` prints the URL and opens it in the browser; it starts the server
+   on the first call (detached, so it outlives this session) and reuses it on
+   later ones.
+2. From here on, every edit/todo/commit this session makes is recorded and
+   shows up live on that board. Tell the user recording is **on for this
+   session only**, give them the URL `board.js` printed, and mention
+   `/nightshift off` to stop.
 
 ## `/nightshift off` (or `stop`)
 ```sh
@@ -47,10 +51,12 @@ node "$REPO/tools/emit.js" session --phase idle --log "$LOG"
 Confirm recording is paused for this session (the tape is kept).
 
 ## `/nightshift watch`
-Don't background a server yourself (it dies with the session). Print the exact
-command for the user to run in their own terminal:
-`node <server> --dir ~/.nightshift/sessions`, then http://localhost:4173 — the
-session switcher lists every recorded project.
+Just (re)open the board without changing recording state:
+```sh
+REPO=$(node -e 'console.log(require(require("os").homedir()+"/.nightshift/install.json").repo)')
+node "$REPO/tools/board.js" --open --session "$(basename "$(node "$REPO/tools/resolve-log.js")" .jsonl)"
+```
+The session switcher lists every recorded project.
 
 ## `/nightshift status`
 Report whether `~/.nightshift/active/$CLAUDE_CODE_SESSION_ID` exists (recording
