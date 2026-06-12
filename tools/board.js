@@ -23,13 +23,17 @@ const stateFile = path.join(nsHome, 'board.json');
 const serverJs = path.join(__dirname, '..', 'server.js');
 const session = val('--session');
 
-// Is a nightshift board answering on this port? /sessions returns a JSON array,
-// which also distinguishes our global board from anything else on the port.
+// Is OUR global board (serving `sessionsDir`) answering on this port? /whoami
+// distinguishes it from another nightshift server on the same port — e.g. a
+// `npm run demo` (single --log), which must NOT be reused.
 function isBoard(port, cb) {
-  const req = http.get({ host: '127.0.0.1', port, path: '/sessions', timeout: 600 }, res => {
+  const req = http.get({ host: '127.0.0.1', port, path: '/whoami', timeout: 600 }, res => {
     let b = '';
     res.on('data', d => (b += d));
-    res.on('end', () => { try { cb(Array.isArray(JSON.parse(b))); } catch { cb(false); } });
+    res.on('end', () => {
+      try { const j = JSON.parse(b); cb(!!(j.nightshift && j.dir === sessionsDir)); }
+      catch { cb(false); }
+    });
   });
   req.on('error', () => cb(false));
   req.on('timeout', () => { req.destroy(); cb(false); });
@@ -61,26 +65,31 @@ function done(port) {
   if (has('--open')) openUrl(url);
 }
 
-function start() {
-  const preferred = Number(val('--port')) || 4173;
+// Start our global board on the first free port >= preferred, then confirm via
+// /whoami that the port is actually serving OUR sessions dir. If something else
+// owns it (lost a race, or a foreign server squats the port), advance and retry
+// — never hand back a URL to a server that isn't ours.
+function start(preferred, attemptsLeft) {
+  if (attemptsLeft <= 0) { process.stderr.write('could not start board\n'); return done(preferred); }
   freePort(preferred, port => {
     fs.mkdirSync(sessionsDir, { recursive: true });
     const out = fs.openSync(path.join(nsHome, 'board.log'), 'a');
     const child = spawn(process.execPath, [serverJs, '--dir', sessionsDir, '--port', String(port)],
       { detached: true, stdio: ['ignore', out, out] });
     child.unref();
-    fs.writeFileSync(stateFile, JSON.stringify({ port, pid: child.pid }) + '\n');
     let tries = 0;
     const wait = () => isBoard(port, ok => {
-      if (ok || tries++ > 30) return done(port);
+      if (ok) { fs.writeFileSync(stateFile, JSON.stringify({ port, pid: child.pid }) + '\n'); return done(port); }
+      if (tries++ > 25) return start(port + 1, attemptsLeft - 1); // ours never came up here
       setTimeout(wait, 100);
     });
     setTimeout(wait, 150);
   });
 }
 
-// Reuse the board we started before, if it's still alive; else start one.
+const preferred = Number(val('--port')) || 4173;
+// Reuse the board we started before only if it's still OUR sessions board.
 let prev = null;
 try { prev = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { /* none yet */ }
-if (prev && prev.port) isBoard(prev.port, ok => (ok ? done(prev.port) : start()));
-else start();
+if (prev && prev.port) isBoard(prev.port, ok => (ok ? done(prev.port) : start(preferred, 12)));
+else start(preferred, 12);

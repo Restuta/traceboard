@@ -24,30 +24,45 @@ const PUBLIC = path.join(__dirname, 'public');
 // order. Each becomes a session with its own tail offset and SSE client set.
 
 const logPaths = [];
+let servedDir = null; // the --dir, if any — reported by /whoami and rescanned
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--log' && args[i + 1]) logPaths.push(path.resolve(args[++i]));
   else if (args[i] === '--dir' && args[i + 1]) {
-    const dir = path.resolve(args[++i]);
+    servedDir = path.resolve(args[++i]);
     try {
-      for (const f of fs.readdirSync(dir).sort()) {
-        if (f.endsWith('.jsonl')) logPaths.push(path.join(dir, f));
+      for (const f of fs.readdirSync(servedDir).sort()) {
+        if (f.endsWith('.jsonl')) logPaths.push(path.join(servedDir, f));
       }
-    } catch { console.error(`--dir: cannot read ${dir}`); }
+    } catch { console.error(`--dir: cannot read ${servedDir}`); }
   }
 }
 if (!logPaths.length) logPaths.push(path.resolve(path.join('.nightshift', 'events.jsonl')));
 
 const sessions = new Map(); // id → {id, file, offset, partial, clients}
 const usedIds = new Set();
-for (const file of logPaths) {
-  if ([...sessions.values()].some(s => s.file === file)) continue; // dedupe
+function addSession(file) {
+  if ([...sessions.values()].some(s => s.file === file)) return null; // already served
   let id = path.basename(file).replace(/\.jsonl$/, '') || 'session';
   let n = 2;
   while (usedIds.has(id)) id = `${path.basename(file).replace(/\.jsonl$/, '')}-${n++}`;
   usedIds.add(id);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) fs.writeFileSync(file, '');
-  sessions.set(id, { id, file, offset: fs.statSync(file).size, partial: '', clients: new Set() });
+  const s = { id, file, offset: fs.statSync(file).size, partial: '', clients: new Set() };
+  sessions.set(id, s);
+  try { fs.watch(s.file, () => drain(s)); } catch { /* polling covers it */ }
+  return s;
+}
+for (const file of logPaths) addSession(file);
+
+// A persistent --dir board should surface projects recorded after it started,
+// so rescan the folder for new *.jsonl. (Open pages see them on refresh.)
+if (servedDir) {
+  setInterval(() => {
+    let files = [];
+    try { files = fs.readdirSync(servedDir); } catch { return; }
+    for (const f of files) if (f.endsWith('.jsonl')) addSession(path.join(servedDir, f));
+  }, 3000).unref();
 }
 const defaultSession = sessions.keys().next().value;
 
@@ -99,9 +114,7 @@ function drain(s) {
   });
 }
 
-for (const s of sessions.values()) {
-  try { fs.watch(s.file, () => drain(s)); } catch { /* polling covers it */ }
-}
+// addSession() sets up each file's watch; a poll backs them up.
 setInterval(() => { for (const s of sessions.values()) drain(s); }, 300).unref();
 
 // ----------------------------------------------------------------- http bits
@@ -129,6 +142,14 @@ function sessionFromQuery(url) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+
+  if (url.pathname === '/whoami') {
+    // Lets tools/board.js confirm it's talking to the GLOBAL sessions board
+    // (serving servedDir) and not, say, a `npm run demo` on the same port.
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ nightshift: true, dir: servedDir, port: PORT }));
+    return;
+  }
 
   if (url.pathname === '/sessions') {
     res.writeHead(200, { 'content-type': 'application/json' });
