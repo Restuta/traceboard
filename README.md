@@ -96,6 +96,17 @@ Undo everything with `node tools/install-global.js --remove`.
 Projects you explicitly `attach` (below) record every session unconditionally
 and keep their own local log — use one mode or the other per project, not both.
 
+### Codex
+
+`/nightshift` works in Codex too — `node tools/install-codex.js` once, then
+`/nightshift` in any Codex session. Codex has no per-tool hooks, so instead of
+gated hooks it **tails the rollout file Codex already writes**
+(`~/.codex/sessions/…`) and converts it to board events live (`tools/codex-tail.js`).
+The same skill file serves both hosts and the tapes land in the same
+`~/.nightshift/sessions/`, so one board (`--dir`) shows your Claude *and* Codex
+sessions side by side. No Codex config is touched — recording is purely the
+rollout tail, stopped with `/nightshift off`.
+
 ## Attaching a single project
 
 When you want the log to live inside one repo (e.g. to share it with a team):

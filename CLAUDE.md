@@ -59,6 +59,14 @@ including the ones building it.
 - `tools/board.js` — ensures one detached board server is running (serving
   `~/.nightshift/sessions`), reused across sessions via `~/.nightshift/board.json`;
   prints the URL and, with `--open`, opens the browser at `?session=<slug>`.
+- `tools/install-codex.js` — Codex counterpart of the global install: symlinks
+  the (shared) `/nightshift` skill into `~/.codex/skills/`. Touches no Codex
+  config — Codex recording is the rollout tail, not hooks.
+- `tools/codex-tail.js` — live-records a Codex session by tailing its rollout
+  (`~/.codex/sessions/…`) → nightshift events; Codex has no per-tool hooks but
+  journals every turn to the rollout. Self-detaches, idempotent per log
+  (`~/.nightshift/codex-tails.json`), `--stop` ends it, idle-exits after ~30 min
+  of no growth. Shares the Codex line→event mapping with `import-transcript.js`.
 - `tools/poll-github.js` — records PR/CI facts as events via gh; folds the
   log's known state each tick and appends only deltas (stateless, idempotent).
 - `demo/generate.js` — synthesizes a realistic session log for demos and UI work.
