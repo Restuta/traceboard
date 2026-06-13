@@ -156,8 +156,9 @@ async function initSessions() {
     if (age < 30 * 60e3) return '🟡';     // within 30 min — recent
     return '⚪';                           // older — stale
   };
-  // Label by directory (worktrees share a title but differ by cwd).
-  const place = s => (s.cwd ? s.cwd.split('/').pop() : s.title) || s.id;
+  // Worktree tapes share a title and even a cwd; the slug is the one reliable
+  // distinguisher. Strip the ~/Projects prefix for a readable, unique label.
+  const place = s => s.id.replace(/^Users-[^-]+-Projects-/, '') || s.title || s.id;
   const sel = $('#session-select');
   if (list.length > 1) {
     sel.innerHTML = list.map(s =>
