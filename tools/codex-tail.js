@@ -155,10 +155,10 @@ function step(e) {
       state.titled = true;
       state.phase = 'working';
     } else if (p.type === 'task_complete') {
-      // The turn's card stays in "in progress" — it's the current focus — until
-      // the next prompt supersedes it. Only the session badge flips to idle.
-      out.push({ t, type: 'session', phase: 'idle' });
-      state.phase = 'idle';
+      // Do NOT go idle here — Codex fires task_complete after every internal
+      // task, and an autonomous run continues. The tailer emits idle only when
+      // the rollout actually goes quiet (see the static check below), so the
+      // badge reflects real activity, not task boundaries.
     } else if (p.type === 'patch_apply_end' && p.success && p.changes) {
       state.lastActivityT = t;
       for (const file of Object.keys(p.changes)) {
@@ -223,7 +223,8 @@ function append(events) {
 
 // --- tail loop --------------------------------------------------------------
 
-let offset = 0, partial = '', idleTicks = 0;
+let offset = 0, partial = '', idleTicks = 0, emittedIdle = false;
+const IDLE_EMIT_TICKS = 120;  // ~60s of no rollout growth → the agent is idle
 const IDLE_EXIT_TICKS = 3600; // ~30 min of no growth (500ms ticks) → worker exits
 function drain() {
   let size;
@@ -231,6 +232,7 @@ function drain() {
   if (size < offset) { offset = 0; partial = ''; }
   if (size === offset) { idleTicks++; return; }
   idleTicks = 0;
+  emittedIdle = false; // rollout grew → the session is live again
   const buf = Buffer.alloc(size - offset);
   const fd = fs.openSync(rollout, 'r');
   try { fs.readSync(fd, buf, 0, buf.length, offset); } finally { fs.closeSync(fd); }
@@ -257,7 +259,12 @@ if (!once) {
   try { fs.watch(rollout, drain); } catch { /* polling covers it */ }
   setInterval(() => {
     drain();
-    if (idleTicks > IDLE_EXIT_TICKS) { cleanupState(); process.exit(0); } // session went quiet
+    // Rollout quiet for a while → mark idle once (a later flush wakes it).
+    if (idleTicks >= IDLE_EMIT_TICKS && !emittedIdle && state.started) {
+      emittedIdle = true;
+      append([{ t: Date.now(), type: 'session', phase: 'idle' }]);
+    }
+    if (idleTicks > IDLE_EXIT_TICKS) { cleanupState(); process.exit(0); } // long-dead → exit
   }, 500);
   process.on('SIGTERM', () => { cleanupState(); process.exit(0); });
   console.error(`tailing ${rollout}\n     → ${LOG}`);

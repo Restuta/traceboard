@@ -192,9 +192,8 @@ function parseCodex(lines) {
         phase = 'working';
         r.prompts++;
       } else if (p.type === 'task_complete') {
-        // Keep the turn's card in progress until the next prompt supersedes it.
-        r.events.push({ t, type: 'session', phase: 'idle' });
-        phase = 'idle';
+        // Not idle per-task — the lull before the next prompt is where idle is
+        // emitted (above), matching the live tailer's quiet-rollout heuristic.
       } else if (p.type === 'patch_apply_end' && p.success && p.changes) {
         lastActivityT = t;
         for (const file of Object.keys(p.changes)) {
