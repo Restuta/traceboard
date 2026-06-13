@@ -375,6 +375,13 @@ function makeCard() {
     prtxt: el.querySelector('.prtxt'),
     tlist: el.querySelector('.todo-list'),
   };
+  // Click a card with a plan to expand/collapse its steps (the active card
+  // shows them anyway). Don't hijack clicks on the PR link.
+  el.addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    if (!el.classList.contains('has-todos')) return;
+    el.classList.toggle('expanded');
+  });
   return el;
 }
 
@@ -401,6 +408,8 @@ function updateCard(el, it, animate, activeId) {
 
   const hasTodos = !!(it.todos && it.todos.length);
   R.progress.style.display = hasTodos ? '' : 'none';
+  el.classList.toggle('has-todos', hasTodos);
+  if (!hasTodos) el.classList.remove('expanded');
   if (hasTodos) {
     const done = it.todos.filter(t => t.done).length;
     const pct = (done / it.todos.length) * 100;

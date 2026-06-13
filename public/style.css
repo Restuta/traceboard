@@ -404,7 +404,21 @@ body.tape-collapsed .tape { border-left: none; }
 .pill.pr .ci.fail { background: var(--red); }
 
 .todo-list { list-style: none; margin-top: 9px; display: none; }
-.card.is-active .todo-list { display: block; }
+.card.is-active .todo-list,
+.card.expanded .todo-list { display: block; }
+
+/* a card with a plan is clickable to reveal its steps */
+.card.has-todos:not(.is-active) { cursor: pointer; }
+.card.has-todos:not(.is-active) .pill.progress { position: relative; }
+.card.has-todos:not(.is-active) .pill.progress::after {
+  content: '›';
+  margin-left: 1px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--faint);
+  transition: transform .15s ease;
+}
+.card.expanded .pill.progress::after { transform: rotate(90deg); }
 
 .todo-list li {
   font-size: 12px;
