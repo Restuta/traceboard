@@ -158,7 +158,7 @@ function parseCodex(lines) {
     sessionId: null, cwd: null, title: null,
     firstT: null, lastT: null, prompts: 0, edits: 0,
   };
-  let lastActivityT = null, phase = null, model = null, turnN = 0, card = null;
+  let lastActivityT = null, phase = null, model = null, turnN = 0, card = null, lastToolKey = null;
   const pendingCommitCalls = new Map(); // call_id → t of the exec call
 
   for (const line of lines) {
@@ -229,7 +229,12 @@ function parseCodex(lines) {
         let cmd = '';
         try { cmd = JSON.parse(p.arguments || '{}').cmd || ''; } catch { /* not json */ }
         if (cmd) {
-          r.events.push({ t, type: 'tool', tool: 'run', text: cmd.replace(/\s+/g, ' ').trim().slice(0, 120), ...(card ? { item: card } : {}) });
+          const text = cmd.replace(/\s+/g, ' ').trim().slice(0, 120);
+          const key = `${t}|${text}`;
+          if (key !== lastToolKey) {
+            lastToolKey = key;
+            r.events.push({ t, type: 'tool', tool: 'run', text, ...(card ? { item: card } : {}) });
+          }
           if (/git .*commit/.test(cmd)) pendingCommitCalls.set(p.call_id, t);
         }
       } else if (p.type === 'function_call_output' && pendingCommitCalls.has(p.call_id)) {

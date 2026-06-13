@@ -108,6 +108,7 @@ if (!worker && !once) {
 const state = {
   phase: null, model: null, lastActivityT: null, started: false, titled: false,
   turnN: 0, card: null, // one card per turn (prompt)
+  lastToolKey: null, // dedupe Codex's same-instant double-logged commands
   pending: new Map(), // call_id → t
 };
 
@@ -189,7 +190,14 @@ function step(e) {
       try { cmd = JSON.parse(p.arguments || '{}').cmd || ''; } catch { /* not json */ }
       if (cmd) {
         // Surface the command as activity so a working turn scrolls the tape.
-        out.push({ t, type: 'tool', tool: 'run', text: cmd.replace(/\s+/g, ' ').trim().slice(0, 120), ...(state.card ? { item: state.card } : {}) });
+        // Codex sometimes logs the same call twice at one timestamp — skip the
+        // byte-identical repeat (legit reruns differ by t and are kept).
+        const text = cmd.replace(/\s+/g, ' ').trim().slice(0, 120);
+        const key = `${t}|${text}`;
+        if (key !== state.lastToolKey) {
+          state.lastToolKey = key;
+          out.push({ t, type: 'tool', tool: 'run', text, ...(state.card ? { item: state.card } : {}) });
+        }
         if (/git\s+.*commit/.test(cmd)) state.pending.set(p.call_id, t);
       }
     } else if (p.type === 'function_call_output' && state.pending.has(p.call_id)) {
