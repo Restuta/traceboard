@@ -49,6 +49,17 @@ export function initialState() {
   };
 }
 
+// Any agent activity means the session is live again. Codex fires task_complete
+// at the end of every internal task, so in an autonomous run (no human prompts
+// to "resume") the badge would otherwise stick on idle while the agent keeps
+// working — this flips it back on the next edit/command/plan/commit.
+function awake(state) {
+  if (state.session.phase === 'idle' || state.session.phase === 'attention') {
+    state.session.phase = 'working';
+    state.session.attentionText = null;
+  }
+}
+
 // Most recently touched item still in `doing` — the card the agent is on now.
 function activeDoingItem(state) {
   let best = null;
@@ -142,6 +153,7 @@ export function reduce(state, ev) {
       state.todos = todos;
       const it = targetItem(state, ev);
       if (it) { it.todos = todos; it.touchedAt = ev.t; }
+      awake(state);
       break;
     }
 
@@ -155,11 +167,7 @@ export function reduce(state, ev) {
       }
       const it = targetItem(state, ev);
       if (it) { it.edits++; it.touchedAt = ev.t; }
-      // Tool activity means the request was answered — clear the alarm.
-      if (state.session.phase === 'attention') {
-        state.session.phase = 'working';
-        state.session.attentionText = null;
-      }
+      awake(state);
       break;
     }
 
@@ -174,10 +182,7 @@ export function reduce(state, ev) {
         it.del += ev.del || 0;
         it.touchedAt = ev.t;
       }
-      if (state.session.phase === 'attention') {
-        state.session.phase = 'working';
-        state.session.attentionText = null;
-      }
+      awake(state);
       break;
     }
 
@@ -210,10 +215,7 @@ export function reduce(state, ev) {
       state.totals.tools = (state.totals.tools || 0) + 1;
       const it = targetItem(state, ev);
       if (it) { it.tools = (it.tools || 0) + 1; it.touchedAt = ev.t; }
-      if (state.session.phase === 'attention') {
-        state.session.phase = 'working';
-        state.session.attentionText = null;
-      }
+      awake(state);
       break;
     }
 
