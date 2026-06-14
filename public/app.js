@@ -84,11 +84,13 @@ function setNum(el, val, animate, fmt = n => n.toLocaleString('en-US')) {
 let es = null;
 let sessionId = null;
 let firstConnect = true;
+let lastBeat = 0;       // last time the stream showed life (any message or ping)
+let retry = 0;          // backoff counter for explicit reconnects
 
+// Switch to a session: wipe the view, then open the stream. State reset lives
+// here so a bare reconnect (openStream) can re-sync without clearing the board.
 function connect(id) {
-  if (es) es.close();
   sessionId = id;
-  // Fresh slate for the incoming tape.
   log.length = 0;
   state = initialState();
   cursor = 0;
@@ -97,13 +99,31 @@ function connect(id) {
   for (const el of cardEls.values()) el.remove();
   cardEls.clear();
   feedEl.innerHTML = '';
+  openStream(id);
+}
 
+// Open (or re-open) the SSE stream for the current session. The server replays
+// full history then emits `ready`, so every connection is self-contained: we
+// buffer this connection's replay and swap it in wholesale on `ready`. That
+// makes reconnects idempotent — a native auto-reconnect that re-streams history
+// can't double-count, and a forced reconnect re-syncs from a clean slate.
+function openStream(id) {
+  if (es) { es.onerror = null; es.close(); }
+  let buf = [];           // this connection's replay, applied atomically on ready
+  let connReady = false;
+  lastBeat = Date.now();
   es = new EventSource('/sse?session=' + encodeURIComponent(id));
 
+  es.onopen = () => { retry = 0; lastBeat = Date.now(); };
+
+  es.addEventListener('ping', () => { lastBeat = Date.now(); });
+
   es.onmessage = e => {
+    lastBeat = Date.now();
     let ev;
     try { ev = JSON.parse(e.data); } catch { return; }
     if (typeof ev.t !== 'number' || typeof ev.type !== 'string') return;
+    if (!connReady) { buf.push(ev); return; }  // history replay → buffer
     log.push(ev);
     if (!ready) return;
     if (live) {
@@ -116,10 +136,24 @@ function connect(id) {
   };
 
   es.addEventListener('ready', () => {
+    // Authoritative full history for this connection. Replace the log wholesale
+    // so a reconnect heals instead of appending duplicates.
+    connReady = true;
+    const wasLive = live;
+    log.length = 0;
+    for (const ev of buf) log.push(ev);
+    buf = [];
     ready = true;
-    state = fold(log);
-    cursor = log.length;
-    vt = log.length ? log[log.length - 1].t : Date.now();
+    lastBeat = Date.now();
+    renderStatus();
+    if (wasLive) {
+      state = fold(log);
+      cursor = log.length;
+      vt = log.length ? log[log.length - 1].t : Date.now();
+    } else {
+      state = fold(log, vt);  // a reconnect mid-replay keeps your scrub position
+      cursor = upperBound(vt);
+    }
     renderAll(false);
     // deep link into the tape: ?at=0.45 (fraction) or ?at=620 (seconds from
     // start). Only on the initial load — switching sessions starts live.
@@ -134,8 +168,33 @@ function connect(id) {
     }
   });
 
-  es.onerror = () => { $('#status-text').textContent = 'RECONNECTING'; };
+  es.onerror = () => {
+    $('#status-text').textContent = 'RECONNECTING';
+    // Native EventSource retries on its own while CONNECTING; only step in when
+    // it has given up (CLOSED), with backoff, so a downed server is handled too.
+    if (es.readyState === EventSource.CLOSED) {
+      const delay = Math.min(1000 * 2 ** retry++, 15000);
+      setTimeout(() => { if (sessionId === id) openStream(id); }, delay);
+    }
+  };
 }
+
+// Liveness watchdog: a socket can wedge open (laptop sleep) without ever firing
+// `onerror`, so the stream looks alive but is dead. The server pings every 25s;
+// if no message or ping has landed in 60s while the tab is visible, force a
+// clean reconnect. Hidden tabs are left alone — visibilitychange catches wake.
+setInterval(() => {
+  if (document.visibilityState !== 'visible') return;
+  if (sessionId && Date.now() - lastBeat > 60000) openStream(sessionId);
+}, 10000);
+
+// Returning to a stale tab (woke from sleep, switched back) — resync at once
+// rather than waiting out the watchdog.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && sessionId && Date.now() - lastBeat > 30000) {
+    openStream(sessionId);
+  }
+});
 
 // Session switcher — fetch the served tapes; show the dropdown when >1.
 // Most-recently-active first, with a live/idle marker, so you can't get stranded

@@ -171,7 +171,10 @@ const server = http.createServer((req, res) => {
     }
     res.write('event: ready\ndata: {}\n\n');
     s.clients.add(res);
-    const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+    // Real `ping` event (not a `:` comment) so the client can observe liveness
+    // and detect a wedged socket — a comment fires no handler, so a board left
+    // running through a laptop sleep can't tell its stream died.
+    const ping = setInterval(() => res.write('event: ping\ndata: {}\n\n'), 25000);
     req.on('close', () => { s.clients.delete(res); clearInterval(ping); });
     return;
   }
