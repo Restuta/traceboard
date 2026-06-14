@@ -78,21 +78,25 @@
   </section>
 
   <aside class="tape" id="tape">
-    <header class="col-head tape-head">
-      <h2>Activity</h2><span class="col-count" id="count-feed"></span>
-      <button class="icon-btn" id="tape-close" title="collapse tape">
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 3.5 L8.5 7 L5 10.5"/></svg>
-      </button>
-    </header>
     <div class="prs" id="prs" hidden>
-      <h3>Pull requests <span class="prs-count" id="prs-count"></span></h3>
+      <header class="prs-head">
+        <h3>Pull requests <span class="prs-count" id="prs-count"></span></h3>
+        <button class="icon-btn" id="tape-close" title="collapse panel">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 3.5 L8.5 7 L5 10.5"/></svg>
+        </button>
+      </header>
       <ul id="prs-list"></ul>
     </div>
-    <div class="hotfiles" id="hotfiles" hidden>
-      <h3>Hot files</h3>
-      <ul id="hotfiles-list"></ul>
+    <div class="subpanels" id="subpanels">
+      <div class="hotfiles collapsed" id="hotfiles" hidden>
+        <h3 class="collapser" id="hotfiles-toggle">Hot files <i class="chev">›</i></h3>
+        <ul id="hotfiles-list"></ul>
+      </div>
+      <div class="activity collapsed" id="activity">
+        <h3 class="collapser" id="activity-toggle">Activity <span class="col-count" id="count-feed"></span> <i class="chev">›</i></h3>
+        <ul class="feed" id="feed"></ul>
+      </div>
     </div>
-    <ul class="feed" id="feed"></ul>
   </aside>
 </main>
 

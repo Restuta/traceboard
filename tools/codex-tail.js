@@ -217,12 +217,12 @@ function prMergesFrom(text, t) {
   return [...nums].map(n => ({ t, type: 'pr', number: n, state: 'merged' }));
 }
 
-// Map a toast review-ci result to a ci status: ready→pass, anything else→pending,
-// an explicit fail/error→fail.
+// Map a toast review-ci result to a ci status. Toast's vocabulary: ready (good),
+// pending (running), needs_fix / blocked / github_blocked (action needed).
 function toastCi(text) {
-  if (/"status":"(ready|clean|passing)"/.test(text)) return 'pass';
-  if (/"status":"(fail|error|failing)"/.test(text)) return 'fail';
-  if (/"status":"(blocking|pending|in_progress)"/.test(text)) return 'pending';
+  if (/"status":\s*"(ready|pass|passing|clean)"/.test(text)) return 'pass';
+  if (/"status":\s*"(needs_fix|blocked|github_blocked|fail|failing|error)"/.test(text)) return 'fail';
+  if (/"status":\s*"(pending|in_progress|active|running|blocking)"/.test(text)) return 'pending';
   return null;
 }
 
@@ -307,8 +307,10 @@ function step(e) {
         // NB: a `gh pr merge N` command is NOT proof of merge — these go through
         // a Toast gate and are often blocked. Merge state comes only from the
         // authoritative open-list reconciliation below.
-        const tt = cmd.match(/toast\s+review-ci[^\n]*--pr\s+(\d+)/);
-        if (tt) state.toastPending.set(p.call_id, Number(tt[1]));
+        if (/\btoast\b/.test(cmd)) {
+          const tt = cmd.match(/--pr\s+(\d+)/);
+          if (tt) state.toastPending.set(p.call_id, Number(tt[1]));
+        }
         // An unfiltered open-list is the source of truth for what's still open.
         if (/gh pr list/.test(cmd) && /--state open/.test(cmd) && !/--head/.test(cmd)) {
           state.openListPending.add(p.call_id);

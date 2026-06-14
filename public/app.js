@@ -254,6 +254,22 @@ function sizeCanvas() {
   drawTimeline();
 }
 
+// Pick a round tick interval so the axis shows ~5–8 marks, scaling from
+// minutes (short session) up to days (a multi-day run).
+function niceTickMs(span) {
+  const opts = [60e3, 5 * 60e3, 10 * 60e3, 30 * 60e3, 3600e3, 2 * 3600e3,
+    6 * 3600e3, 12 * 3600e3, 24 * 3600e3, 2 * 86400e3];
+  for (const o of opts) if (span / o <= 8) return o;
+  return opts[opts.length - 1];
+}
+function tickLabel(ms) {
+  const m = Math.round(ms / 60e3);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return m % 60 ? `${h}h${m % 60}m` : `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
 function drawTimeline() {
   const r = canvas.getBoundingClientRect();
   const W = r.width, H = r.height;
@@ -263,41 +279,69 @@ function drawTimeline() {
   const span = t1 - t0;
   const x = t => ((t - t0) / span) * W;
 
-  // event density buckets
+  const prTop = 2, prH = 8;          // PR open→merge band, up top
+  const axisH = 11;                   // elapsed labels, at the bottom
+  const base = H - axisH;             // density baseline sits above the axis
+  const barTop = prTop + prH + 2;
+
+  // --- time axis: faint gridlines + elapsed labels (T+ from start) ---
+  const iv = niceTickMs(span);
+  ctx.font = '9px ui-monospace, SFMono-Regular, monospace';
+  ctx.textBaseline = 'alphabetic';
+  for (let tk = Math.ceil(t0 / iv) * iv; tk <= t1; tk += iv) {
+    const xx = x(tk);
+    ctx.fillStyle = '#161d2e';
+    ctx.fillRect(xx, barTop, 1, base - barTop);
+    ctx.fillStyle = '#5d6781';
+    ctx.fillText(tickLabel(tk - t0), xx + 3, H - 2);
+  }
+
+  // --- event density bars (between the PR band and the axis) ---
   const BW = 4;
   const buckets = new Array(Math.ceil(W / BW)).fill(null);
   for (const ev of log) {
     const i = Math.min(buckets.length - 1, Math.max(0, Math.floor(x(ev.t) / BW)));
-    const b = buckets[i] || (buckets[i] = { n: 0, commit: false, pr: false });
+    const b = buckets[i] || (buckets[i] = { n: 0, commit: false });
     b.n++;
     if (ev.type === 'commit') b.commit = true;
-    if (ev.type === 'pr' || ev.type === 'ci') b.pr = true;
   }
-  const base = H - 12;
   for (let i = 0; i < buckets.length; i++) {
     const b = buckets[i];
     if (!b) continue;
-    const h = Math.min(base - 8, 3 + Math.sqrt(b.n) * 7);
-    ctx.fillStyle = b.commit ? '#d29922' : b.pr ? '#4ea7fc' : '#232c47';
+    const h = Math.min(base - barTop, 2 + Math.sqrt(b.n) * 6);
+    ctx.fillStyle = b.commit ? '#d29922' : '#232c47';
     ctx.fillRect(i * BW + 1, base - h, BW - 2, h);
   }
-
-  // baseline
   ctx.fillStyle = '#1b2338';
   ctx.fillRect(0, base, W, 1);
 
+  // --- PR lifecycles: a line from open (green) to merge (purple) ---
+  const nowX = x(Math.min(vtNow(), t1));
+  for (const pr of prList(state)) {
+    if (pr.openedAt == null) continue;
+    const open = pr.state !== 'merged';
+    const xo = x(pr.openedAt);
+    const xe = open ? nowX : x(pr.mergedAt || pr.t);
+    const y = prTop + prH / 2;
+    ctx.strokeStyle = open ? 'rgba(76,183,130,.45)' : 'rgba(163,113,247,.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xo, y); ctx.lineTo(Math.max(xe, xo + 1), y); ctx.stroke();
+    ctx.fillStyle = '#4cb782';
+    ctx.fillRect(xo - 0.5, prTop, 1.4, prH);          // opened
+    if (!open) { ctx.fillStyle = '#a371f7'; ctx.fillRect(xe - 0.5, prTop, 1.4, prH); } // merged
+  }
+
   // unplayed tape dimmed while in replay
-  const px = x(Math.min(vtNow(), t1));
   if (!live) {
     ctx.fillStyle = 'rgba(7,10,19,.62)';
-    ctx.fillRect(px, 0, W - px, H);
+    ctx.fillRect(nowX, 0, W - nowX, H);
   }
 
   // playhead
   ctx.fillStyle = live ? '#eb6e64' : '#4ea7fc';
-  ctx.fillRect(px - 0.5, 4, 1, H - 8);
+  ctx.fillRect(nowX - 0.5, 0, 1, H - axisH);
   ctx.beginPath();
-  ctx.moveTo(px - 4, 4); ctx.lineTo(px + 4, 4); ctx.lineTo(px, 10);
+  ctx.moveTo(nowX - 4, 0); ctx.lineTo(nowX + 4, 0); ctx.lineTo(nowX, 6);
   ctx.fill();
 }
 
@@ -602,20 +646,21 @@ function renderPRs() {
     ? `<a href="${esc(pr.url)}" target="_blank" rel="noopener">#${pr.number}</a>`
     : `#${pr.number}`;
   const title = pr => pr.title ? `<span class="prtitle">${esc(pr.title)}</span>` : '';
-  // Toast / CI status, spelled out (no cryptic bare dot).
+  // Toast / CI status, spelled out and always present so it leads each open row —
+  // the colored chip is the one thing that means "status".
   const status = pr => {
-    if (pr.ci === 'pass') return '<span class="prci pass">✓ ready</span>';
-    if (pr.ci === 'fail') return '<span class="prci fail">✗ blocked</span>';
-    if (pr.ci === 'pending') return '<span class="prci pending">⋯ checks</span>';
-    return '';
+    if (pr.ci === 'pass') return '<span class="prci pass" title="Toast/CI passing">✓ ready</span>';
+    if (pr.ci === 'fail') return '<span class="prci fail" title="checks failing / blocked">✗ blocked</span>';
+    if (pr.ci === 'pending') return '<span class="prci pending" title="checks running">⋯ checks</span>';
+    return '<span class="prci unknown" title="open — no check status seen yet">open</span>';
   };
 
   const openRows = open.map(pr =>
-    `<li class="pr-open"><b class="prnum">${num(pr)}</b>${status(pr)}${title(pr)}` +
-    `<span class="prage">${pr.openedAt ? ageText(now - pr.openedAt) : ''}</span></li>`).join('');
+    `<li class="pr-open">${status(pr)}<b class="prnum">${num(pr)}</b>${title(pr)}` +
+    `<span class="prage" title="open for">${pr.openedAt ? ageText(now - pr.openedAt) : ''}</span></li>`).join('');
   const mergedRows = merged.slice(0, RECENT_MERGES).map(pr =>
     `<li class="pr-merged"><b class="prnum">${num(pr)}</b>${title(pr)}` +
-    `<span class="prage">merged ${pr.mergedAt ? ageText(now - pr.mergedAt) + ' ago' : ''}</span></li>`).join('');
+    `<span class="prage" title="merged">${pr.mergedAt ? ageText(now - pr.mergedAt) : ''}</span></li>`).join('');
   const more = merged.length > RECENT_MERGES
     ? `<li class="pr-more">+${merged.length - RECENT_MERGES} more merged</li>` : '';
 
@@ -775,6 +820,17 @@ function setTape(collapsed) {
 $('#tape-toggle').addEventListener('click', () =>
   setTape(!document.body.classList.contains('tape-collapsed')));
 $('#tape-close').addEventListener('click', () => setTape(true));
+
+// Hot files / Activity are secondary — collapsed by default, click to expand.
+const subToggle = (btn, panel, key) => {
+  $(btn).addEventListener('click', () => {
+    const collapsed = $(panel).classList.toggle('collapsed');
+    try { localStorage.setItem(key, collapsed ? '1' : '0'); } catch { /* private */ }
+  });
+  try { if (localStorage.getItem(key) === '0') $(panel).classList.remove('collapsed'); } catch { /* private */ }
+};
+subToggle('#hotfiles-toggle', '#hotfiles', 'ns-hotfiles');
+subToggle('#activity-toggle', '#activity', 'ns-activity');
 
 let tapeCollapsed = false;
 try { tapeCollapsed = localStorage.getItem(TAPE_KEY) === '1'; } catch { /* private mode */ }
