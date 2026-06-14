@@ -238,13 +238,28 @@ button { font-family: inherit; }
 .deck {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 304px;
+  grid-template-columns: 1fr var(--tape-w, 304px);
   min-height: 0;
   transition: grid-template-columns .22s ease;
 }
 
 body.tape-collapsed .deck { grid-template-columns: 1fr 0px; }
 body.tape-collapsed .tape { border-left: none; }
+body.resizing .deck { transition: none; }
+body.resizing { cursor: col-resize; user-select: none; }
+
+.tape-resize {
+  position: absolute;
+  left: 0; top: 0;
+  width: 7px; height: 100%;
+  cursor: col-resize;
+  z-index: 6;
+}
+.tape-resize:hover, body.resizing .tape-resize {
+  background: linear-gradient(to right, transparent 40%, var(--blue) 50%, transparent 60%);
+  opacity: .55;
+}
+body.tape-collapsed .tape-resize { display: none; }
 
 .board {
   display: grid;
@@ -336,7 +351,8 @@ body.tape-collapsed .tape { border-left: none; }
   text-transform: uppercase;
 }
 
-.age { font-family: var(--mono); font-size: 10px; color: var(--faint); opacity: .8; }
+.age { font-family: var(--mono); font-size: 10px; color: var(--faint); opacity: .8; white-space: nowrap; }
+.age .stale { color: var(--yellow); }
 
 .card .title { font-size: 13px; font-weight: 500; line-height: 1.45; letter-spacing: -.005em; }
 
@@ -465,6 +481,7 @@ body.tape-collapsed .tape { border-left: none; }
 /* ----------------------------------------------------------------- tape */
 
 .tape {
+  position: relative;
   border-left: 1px solid var(--line-soft);
   display: flex;
   flex-direction: column;
@@ -556,6 +573,17 @@ body.tape-collapsed .tape { border-left: none; }
   padding: 0;
 }
 .prs li.pr-head:first-child { margin-top: 0; }
+
+/* a PR row is a link to GitHub — clickable, with a clear hover affordance */
+.prs li[data-url] {
+  cursor: pointer;
+  border-radius: 5px;
+  margin: 0 -6px;
+  padding: 3px 6px;
+  transition: background .1s ease;
+}
+.prs li[data-url]:hover { background: var(--card-hover); }
+.prs li[data-url]:hover .prtitle { color: var(--ink); }
 
 .prs .prnum { font-family: var(--mono); font-weight: 500; flex: none; }
 .prs .prnum a { color: var(--blue); text-decoration: none; }

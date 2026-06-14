@@ -401,6 +401,17 @@ const cardEls = new Map();
 const cols = Object.fromEntries(STATUSES.map(s => [s, $(`#cards-${s}`)]));
 const counts = Object.fromEntries(STATUSES.map(s => [s, $(`#count-${s}`)]));
 
+// The corner timing on a card. Done: how long the work took. In progress: how
+// long it's been running, plus an "idle Xm" flag if nothing's updated it lately
+// (so a stalled card is visible at a glance).
+function cardTiming(el) {
+  if (el._status === 'done') return el._activeMs > 0 ? `took ${ageText(el._activeMs)}` : '';
+  const dur = el._activeMs + (el._activeLive ? Math.max(0, vtNow() - state.session.lastAt) : 0);
+  if (dur <= 0) return '';
+  const idle = Math.max(0, vtNow() - (el._touchedAt || vtNow()));
+  return ageText(dur) + (idle > 90e3 ? ` <span class="stale">· idle ${ageText(idle)}</span>` : '');
+}
+
 function makeCard() {
   const el = document.createElement('article');
   el.className = 'card';
@@ -449,11 +460,12 @@ function updateCard(el, it, animate, activeId) {
   R.title.textContent = it.title || it.id;
 
   // Time worked, not time since touched. The active `doing` card keeps
-  // accruing the in-flight gap between events (see _activeLive ticker).
+  // accruing the in-flight gap between events (see the age ticker).
   el._activeMs = it.activeMs || 0;
   el._activeLive = it.id === activeId && state.session.phase === 'working';
-  const dur = el._activeMs + (el._activeLive ? Math.max(0, vtNow() - state.session.lastAt) : 0);
-  R.age.textContent = dur > 0 ? ageText(dur) : '';
+  el._touchedAt = it.touchedAt;
+  el._status = it.status;
+  R.age.innerHTML = cardTiming(el);
 
   const hasDiff = !!(it.add || it.del);
   R.diff.style.display = hasDiff ? '' : 'none';
@@ -642,9 +654,7 @@ function renderPRs() {
   $('#prs-count').textContent = open.length ? `${open.length} open` : `${merged.length} merged`;
 
   const now = vtNow();
-  const num = pr => pr.url
-    ? `<a href="${esc(pr.url)}" target="_blank" rel="noopener">#${pr.number}</a>`
-    : `#${pr.number}`;
+  const link = pr => (pr.url ? ` data-url="${esc(pr.url)}"` : ''); // whole row clickable
   const title = pr => pr.title ? `<span class="prtitle">${esc(pr.title)}</span>` : '';
   // Toast / CI status, spelled out and always present so it leads each open row —
   // the colored chip is the one thing that means "status".
@@ -656,11 +666,11 @@ function renderPRs() {
   };
 
   const openRows = open.map(pr =>
-    `<li class="pr-open">${status(pr)}<b class="prnum">${num(pr)}</b>${title(pr)}` +
-    `<span class="prage" title="open for">${pr.openedAt ? ageText(now - pr.openedAt) : ''}</span></li>`).join('');
+    `<li class="pr-open"${link(pr)} title="open PR #${pr.number} on GitHub">${status(pr)}<b class="prnum">#${pr.number}</b>${title(pr)}` +
+    `<span class="prage">${pr.openedAt ? ageText(now - pr.openedAt) : ''}</span></li>`).join('');
   const mergedRows = merged.slice(0, RECENT_MERGES).map(pr =>
-    `<li class="pr-merged"><b class="prnum">${num(pr)}</b>${title(pr)}` +
-    `<span class="prage" title="merged">${pr.mergedAt ? ageText(now - pr.mergedAt) : ''}</span></li>`).join('');
+    `<li class="pr-merged"${link(pr)} title="open PR #${pr.number} on GitHub"><b class="prnum">#${pr.number}</b>${title(pr)}` +
+    `<span class="prage">${pr.mergedAt ? ageText(now - pr.mergedAt) : ''}</span></li>`).join('');
   const more = merged.length > RECENT_MERGES
     ? `<li class="pr-more">+${merged.length - RECENT_MERGES} more merged</li>` : '';
 
@@ -668,6 +678,12 @@ function renderPRs() {
     (open.length ? `<li class="pr-head">In flight</li>${openRows}` : '') +
     (merged.length ? `<li class="pr-head">Recently merged</li>${mergedRows}${more}` : '');
 }
+
+// Whole PR row opens the PR on GitHub (listener on the <ul> survives re-renders).
+$('#prs-list').addEventListener('click', e => {
+  const li = e.target.closest('li[data-url]');
+  if (li) window.open(li.dataset.url, '_blank', 'noopener');
+});
 
 // ------------------------------------------------------------- hot files
 
@@ -859,12 +875,12 @@ $('#add-card-form').addEventListener('submit', async e => {
 
 // ----------------------------------------------------------------- clock
 
-// Advance the running timer on the active card between events (live or while
-// a replay is paused/playing) — only that card has an in-flight gap.
+// Keep the corner timing fresh between events — the active card's worked time
+// ticks up, and any in-progress card's "idle Xm" flag grows while it's quiet.
 function tickActiveCards() {
   for (const el of cardEls.values()) {
-    if (!el._activeLive) continue;
-    el._refs.age.textContent = ageText(el._activeMs + Math.max(0, vtNow() - state.session.lastAt));
+    if (el._status === 'done') continue;
+    el._refs.age.innerHTML = cardTiming(el);
   }
 }
 
@@ -877,6 +893,32 @@ setInterval(() => {
     tickActiveCards();
   }
 }, 1000);
+
+// Drag the left edge of the sidebar to resize it (persisted).
+(() => {
+  const handle = $('#tape-resize');
+  if (!handle) return;
+  const TKEY = 'ns-tape-w';
+  try { const w = localStorage.getItem(TKEY); if (w) document.documentElement.style.setProperty('--tape-w', w); } catch { /* private */ }
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add('resizing');
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!document.body.classList.contains('resizing')) return;
+    const w = Math.max(240, Math.min(820, window.innerWidth - e.clientX));
+    document.documentElement.style.setProperty('--tape-w', `${w}px`);
+  });
+  const end = () => {
+    if (!document.body.classList.contains('resizing')) return;
+    document.body.classList.remove('resizing');
+    try { localStorage.setItem(TKEY, getComputedStyle(document.documentElement).getPropertyValue('--tape-w').trim() || '304px'); } catch { /* private */ }
+    sizeCanvas();
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('lostpointercapture', end);
+})();
 
 sizeCanvas();
 initSessions();
