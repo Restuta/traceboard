@@ -586,21 +586,42 @@ function renderFeed(freshEvents) {
 
 // -------------------------------------------------------- pull requests
 
+const RECENT_MERGES = 8;
+
 function renderPRs() {
   const box = $('#prs');
-  const prs = prList(state);
-  box.hidden = !prs.length;
-  if (!prs.length) return;
-  $('#prs-count').textContent = prs.length;
-  $('#prs-list').innerHTML = prs.map(pr => {
-    const st = pr.state || 'open';
-    const num = pr.url
-      ? `<a href="${esc(pr.url)}" target="_blank" rel="noopener">#${pr.number}</a>`
-      : `#${pr.number}`;
-    const ci = pr.ci ? `<i class="ci ${esc(pr.ci)}" title="checks ${esc(pr.ci)}"></i>` : '';
-    return `<li class="pr-${esc(st)}">${ci}<b class="prnum">${num}</b><span class="prstate">${esc(st)}</span>` +
-      `${pr.title ? `<span class="prtitle">${esc(pr.title)}</span>` : ''}</li>`;
-  }).join('');
+  const all = prList(state);
+  box.hidden = !all.length;
+  if (!all.length) return;
+  const open = all.filter(p => p.state === 'open').sort((a, b) => (b.openedAt || 0) - (a.openedAt || 0));
+  const merged = all.filter(p => p.state === 'merged').sort((a, b) => (b.mergedAt || b.t || 0) - (a.mergedAt || a.t || 0));
+  $('#prs-count').textContent = open.length ? `${open.length} open` : `${merged.length} merged`;
+
+  const now = vtNow();
+  const num = pr => pr.url
+    ? `<a href="${esc(pr.url)}" target="_blank" rel="noopener">#${pr.number}</a>`
+    : `#${pr.number}`;
+  const title = pr => pr.title ? `<span class="prtitle">${esc(pr.title)}</span>` : '';
+  // Toast / CI status, spelled out (no cryptic bare dot).
+  const status = pr => {
+    if (pr.ci === 'pass') return '<span class="prci pass">✓ ready</span>';
+    if (pr.ci === 'fail') return '<span class="prci fail">✗ blocked</span>';
+    if (pr.ci === 'pending') return '<span class="prci pending">⋯ checks</span>';
+    return '';
+  };
+
+  const openRows = open.map(pr =>
+    `<li class="pr-open"><b class="prnum">${num(pr)}</b>${status(pr)}${title(pr)}` +
+    `<span class="prage">${pr.openedAt ? ageText(now - pr.openedAt) : ''}</span></li>`).join('');
+  const mergedRows = merged.slice(0, RECENT_MERGES).map(pr =>
+    `<li class="pr-merged"><b class="prnum">${num(pr)}</b>${title(pr)}` +
+    `<span class="prage">merged ${pr.mergedAt ? ageText(now - pr.mergedAt) + ' ago' : ''}</span></li>`).join('');
+  const more = merged.length > RECENT_MERGES
+    ? `<li class="pr-more">+${merged.length - RECENT_MERGES} more merged</li>` : '';
+
+  $('#prs-list').innerHTML =
+    (open.length ? `<li class="pr-head">In flight</li>${openRows}` : '') +
+    (merged.length ? `<li class="pr-head">Recently merged</li>${mergedRows}${more}` : '');
 }
 
 // ------------------------------------------------------------- hot files

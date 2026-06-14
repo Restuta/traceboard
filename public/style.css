@@ -502,46 +502,43 @@ body.tape-collapsed .tape { border-left: none; }
   margin-left: 2px;
 }
 
-.prs ul { list-style: none; max-height: 38vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.prs ul { list-style: none; max-height: 42vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 
 .prs li {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: baseline;
+  gap: 6px;
   padding: 3px 0;
   font-size: 12px;
   min-width: 0;
 }
 
-.prs .ci {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--faint);
-  flex: none;
+.prs li.pr-head {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--faint);
+  margin: 7px 0 2px;
+  padding: 0;
 }
-.prs .ci.pending { background: var(--yellow); animation: blink 1.2s infinite; }
-.prs .ci.pass { background: var(--green); }
-.prs .ci.fail { background: var(--red); }
+.prs li.pr-head:first-child { margin-top: 0; }
 
 .prs .prnum { font-family: var(--mono); font-weight: 500; flex: none; }
 .prs .prnum a { color: var(--blue); text-decoration: none; }
 .prs .prnum a:hover { text-decoration: underline; }
+.prs li.pr-merged .prnum a, .prs li.pr-merged .prnum { color: var(--merged); }
 
-.prs .prstate {
+.prs .prci {
   flex: none;
   font-size: 9.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  padding: 1px 6px;
-  border-radius: 99px;
-  border: 1px solid var(--line);
-  color: var(--dim);
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
 }
-.prs li.pr-open .prstate { color: var(--green); border-color: #4cb78240; }
-.prs li.pr-merged .prstate { color: var(--merged); border-color: #a371f740; }
-.prs li.pr-merged .prnum a { color: var(--merged); }
-.prs li.pr-closed .prstate { color: var(--faint); }
+.prs .prci.pass { color: var(--green); }
+.prs .prci.fail { color: var(--red); }
+.prs .prci.pending { color: var(--yellow); }
 
 .prs .prtitle {
   flex: 1;
@@ -550,6 +547,19 @@ body.tape-collapsed .tape { border-left: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.prs .prage {
+  flex: none;
+  font-size: 10px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.prs li.pr-more {
+  font-size: 11px;
+  color: var(--faint);
+  padding-top: 4px;
 }
 
 .hotfiles {

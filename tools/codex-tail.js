@@ -176,6 +176,31 @@ function prOpensFrom(text, t) {
   return evs;
 }
 
+// gh json output (gh pr list/view --json number,title,url,headRefName,...) is the
+// source of PR titles. Parse the array (or jq-filtered ndjson) and emit a
+// metadata-only pr event (no state) so the reducer fills in title/url.
+function prMetaFrom(text, t) {
+  if (!(text.includes('"title"') && text.includes('"number"'))) return [];
+  let objs = [];
+  try { const a = JSON.parse(text); if (Array.isArray(a)) objs = a; } catch { /* not a clean array */ }
+  if (!objs.length) {
+    for (const line of text.split('\n')) {
+      const s = line.trim();
+      if (s[0] === '{') { try { objs.push(JSON.parse(s)); } catch { /* skip */ } }
+    }
+  }
+  const out = [];
+  for (const o of objs) {
+    if (typeof o.number !== 'number') continue;
+    const ev = { t, type: 'pr', number: o.number };
+    if (o.title) ev.title = o.title;
+    else if (o.headRefName) ev.title = o.headRefName; // branch name as a fallback
+    if (o.url) ev.url = o.url;
+    out.push(ev);
+  }
+  return out;
+}
+
 // The agent narrates merges reliably ("PR #198 merged", "merged in PR #205").
 // Parse those, guarding against negations ("#261 is not merged yet").
 function prMergesFrom(text, t) {
@@ -311,6 +336,7 @@ function step(e) {
         for (const n of openNow) { state.prsSeen.add(n); out.push({ t, type: 'pr', number: n, state: 'open' }); }
         for (const n of state.prsSeen) if (!openNow.has(n)) out.push({ t, type: 'pr', number: n, state: 'merged' });
       }
+      out.push(...prMetaFrom(o, t)); // titles/urls from gh json output
       out.push(...prOpensFrom(o, t)); // PR urls in command output → opens
     }
   }

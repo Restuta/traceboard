@@ -191,8 +191,10 @@ export function reduce(state, ev) {
       if (ev.number != null) {
         // PRs are session-level entities (the PR panel), tracked by number.
         const pr = state.prs.get(ev.number) ||
-          { number: ev.number, state: 'open', url: null, title: null, ci: null, openedAt: ev.t };
+          { number: ev.number, state: 'open', url: null, title: null, ci: null, openedAt: ev.t, mergedAt: null };
         if (ev.state) pr.state = ev.state;
+        if (ev.state === 'merged' && pr.mergedAt == null) pr.mergedAt = ev.t;
+        if (ev.state === 'open') pr.mergedAt = null; // reopened / corrected
         if (ev.url) pr.url = ev.url;
         if (ev.title) pr.title = ev.title;
         pr.t = ev.t;
