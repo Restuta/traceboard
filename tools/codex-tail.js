@@ -25,23 +25,40 @@ const worker = args.includes('--worker');
 const stop = args.includes('--stop');
 let rollout = args.find(a => !a.startsWith('--') && a !== val('--log'));
 
-// Newest rollout = the session being written right now.
-function newestRollout() {
+// The cwd a rollout was recorded in. The session_meta first line can be tens of
+// KB (it embeds base_instructions), so we read a generous head and pull cwd by
+// regex rather than parsing the whole — a small read truncates and fails.
+function rolloutCwdOf(p) {
+  try {
+    const fd = fs.openSync(p, 'r');
+    const buf = Buffer.alloc(65536);
+    const n = fs.readSync(fd, buf, 0, buf.length, 0);
+    fs.closeSync(fd);
+    const m = buf.toString('utf8', 0, n).match(/"cwd"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    return m ? m[1] : null;
+  } catch { return null; }
+}
+
+// Newest rollout = the session being written right now. With preferCwd, the
+// newest rollout recorded in THAT directory wins — so `/nightshift` attaches to
+// this project's session, not whatever Codex session happened to write last.
+function newestRollout(preferCwd) {
   const base = path.join(os.homedir(), '.codex', 'sessions');
-  let best = null, bestT = 0;
+  let best = null, bestT = 0, bestCwd = null, bestCwdT = 0;
   const walk = d => {
     let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
     for (const e of ents) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
       else if (/^rollout-.*\.jsonl$/.test(e.name)) {
-        const m = fs.statSync(p).mtimeMs;
+        let m = 0; try { m = fs.statSync(p).mtimeMs; } catch { continue; }
         if (m > bestT) { bestT = m; best = p; }
+        if (preferCwd && m > bestCwdT && rolloutCwdOf(p) === preferCwd) { bestCwdT = m; bestCwd = p; }
       }
     }
   };
   walk(base);
-  return best;
+  return bestCwd || best;
 }
 
 const NS_HOME = process.env.NIGHTSHIFT_HOME || path.join(os.homedir(), '.nightshift');
@@ -81,19 +98,6 @@ function findSuccessor(cwd, current) {
   try { curM = fs.statSync(current).mtimeMs; } catch { /* gone */ }
   const base = path.join(os.homedir(), '.codex', 'sessions');
   let best = null, bestM = curM;
-  const firstCwd = p => {
-    try {
-      const fd = fs.openSync(p, 'r');
-      const buf = Buffer.alloc(65536);
-      const n = fs.readSync(fd, buf, 0, buf.length, 0);
-      fs.closeSync(fd);
-      // The session_meta line can be tens of KB (it embeds base_instructions),
-      // so the first line often doesn't fit a small read — parsing it whole
-      // fails and rotation-following silently breaks. Pull cwd from the head.
-      const m = buf.toString('utf8', 0, n).match(/"cwd"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-      return m ? m[1] : null;
-    } catch { return null; }
-  };
   const walk = d => {
     let es; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
     for (const e of es) {
@@ -101,7 +105,7 @@ function findSuccessor(cwd, current) {
       if (e.isDirectory()) walk(p);
       else if (/^rollout-.*\.jsonl$/.test(e.name) && p !== current) {
         let m = 0; try { m = fs.statSync(p).mtimeMs; } catch { continue; }
-        if (m > bestM && firstCwd(p) === cwd) { best = p; bestM = m; }
+        if (m > bestM && rolloutCwdOf(p) === cwd) { best = p; bestM = m; }
       }
     }
   };
@@ -109,7 +113,9 @@ function findSuccessor(cwd, current) {
   return best;
 }
 
-rollout = rollout || newestRollout();
+// Prefer the newest rollout recorded in the current project dir (where the
+// skill runs), so `/nightshift` attaches to THIS session, not a parallel one.
+rollout = rollout || newestRollout(process.cwd());
 if (!rollout || !fs.existsSync(rollout)) {
   console.error('no rollout file found — pass one explicitly or start a Codex session first');
   process.exit(1);
